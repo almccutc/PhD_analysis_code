@@ -57,8 +57,7 @@ classdef PIVanalysis < handle
         function checkHistogram(obj)
             [Ny,Nx,Nt] = size(u_o);
 
-            ucheck = reshape(u_o,1,Nx*Ny*Nt);
-            vcheck = reshape(v_o,1,Nx*Ny*Nt);
+            ucheck = reshape(u_o,1,Nx*Ny*Nt); vcheck = reshape(v_o,1,Nx*Ny*Nt);
 
             figure(1)
             title('Histograms of the $u$ and w velocities---Pre-Filter')
@@ -82,16 +81,13 @@ classdef PIVanalysis < handle
         function applyAGWfilter(obj)
                         [Ny,Nx,Nt] = size(u_o); 
 
-            ucheck = reshape(u_o,1,Nx*Ny*Nt);
-            vcheck = reshape(v_o,1,Nx*Ny*Nt);
+            ucheck = reshape(u_o,1,Nx*Ny*Nt); vcheck = reshape(v_o,1,Nx*Ny*Nt);
 
-            u_o=permute(u_o,[3 2 1]);
-            v_o=permute(v_o,[3 2 1]); 
+            u_o=permute(u_o,[3 2 1]); v_o=permute(v_o,[3 2 1]); 
 
             [Nt,Ny,Nx] = size(u_o);
 
-             uresh = reshape(u_o,Nt*Nx,Ny);
-             vresh = reshape(v_o,Nt*Nx,Ny);
+             uresh = reshape(u_o,Nt*Nx,Ny); vresh = reshape(v_o,Nt*Nx,Ny);
 
 
                 time=1:Nt*Nx;
@@ -104,8 +100,7 @@ classdef PIVanalysis < handle
                 %01_60_120_720_10min_4.5V: 0.4 and -0.4, 0.8979
                 %01_80_120_720_10min_4.5V: 0.4 and -0.4, 0.9418 and 0.9424
 
-                datamax = 0.5; %m/s
-                datamin = -0.5; %m/s
+                %datamax = 0.5; datamin = -0.5; %m/s
 
                 ufill = zeros(Ny,Nt*Nx); %creates double array with the same number of positions as the original data
                 vfill = zeros(Ny,Nt*Nx);
@@ -137,19 +132,16 @@ classdef PIVanalysis < handle
 
                 end
 
-                ufill = ufill';
-                unew = reshape(ufill,Nt,Ny,Nx);
+                ufill = ufill'; unew = reshape(ufill,Nt,Ny,Nx);
 
-                vfill = vfill';
-                vnew = reshape(vfill,Nt,Ny,Nx); %,Nt,Ny,Nx
+                vfill = vfill'; vnew = reshape(vfill,Nt,Ny,Nx);
 
-                flaguAGW0=unew==1000;    %if value is 1000, gets assigned a value of 1 at each index, otherwise is 0
-                flagvAGW0=vnew==1000;
+                %if value is 1000, gets assigned a value of 1 at each index, otherwise is 0
+                flaguAGW0=unew==1000; flagvAGW0=vnew==1000;
                 flaggedAGW0 = flaguAGW0 + flagvAGW0;
                 flaggedAGW0(flaggedAGW0==2)=1;
 
-                unewnan = unew;
-                vnewnan = vnew;
+                unewnan = unew; vnewnan = vnew;
 
                 %sets value of index to NaN if it has a flagged value of 1
                 for tt=1:Nt
@@ -163,11 +155,8 @@ classdef PIVanalysis < handle
                     end
                 end
 
-                u_agw=unewnan;
-                v_agw=vnewnan;
+                u_agw=unewnan; v_agw=vnewnan;
 
-            %     
-            % %----------------------    
             % Percentage of velocities left after the AGW filter has been applied, I think Blair said this should be 90 percent or higher
             % if the data is good
             percentleft = length(utim)/length(time) %it is the same for all components
@@ -202,20 +191,55 @@ classdef PIVanalysis < handle
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function permute(obj)
-             u_o = u_agw;
-             v_o = v_agw;
+            u_o = u_agw; v_o = v_agw;
 
-            u_o=permute(u_o,[1 3 2]);
-            v_o=permute(v_o,[1 3 2]); 
+            u_o=permute(u_o,[1 3 2]); v_o=permute(v_o,[1 3 2]); 
 
-            u_o=permute(u_o,[2 3 1]);
-            v_o=permute(v_o,[2 3 1]);
+            u_o=permute(u_o,[2 3 1]); v_o=permute(v_o,[2 3 1]);
 
-            beep
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        function velocityCalculations(obj)
+            u_mean = nanmean(u_o,3); v_mean = nanmean(v_o,3);
 
+            u_f = u_o-u_mean; v_f = v_o-v_mean;
 
+            u_rms = sqrt(nanmean((u_f.^2),3)); v_rms = sqrt(nanmean((v_f.^2),3));
+
+            obj.tke = 0.5*(2*(u_rms.^2) + (v_rms.^2));
+            
+            %Time average for each subwindow                            
+            figure (1) 
+            subplot(3,2,1)
+            imagesc(u_mean)
+            colorbar
+            caxis([-0.02,0.02])
+            title('Colorbar U-Velocity (m/s)','Interpreter','Latex')
+            subplot(2,2,2)
+            imagesc(v_mean)
+            colorbar
+            caxis([-0.02,0.02])
+            title('Colorbar W-Velocity (m/s)','Interpreter','Latex')
+
+            %Time rms average for each subwindow
+            subplot(2,2,3)
+            imagesc(u_rms)
+            colorbar
+            %caxis([-0.02,0.02])
+            title('Colorbar rms (m/s)')
+            subplot(2,2,4)
+            imagesc(v_rms)
+            colorbar
+            %caxis([-0.02,0.02])
+            title('Colorbar rms (m/s)')
+
+            figure (2)
+            imagesc(tke)
+            colorbar
+            %caxis([-0.02,0.02])
+            title('TKE (m^2/s^2)')
+        end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % add any additional functions here
