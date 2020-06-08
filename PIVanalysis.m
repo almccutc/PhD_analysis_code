@@ -7,16 +7,21 @@ classdef PIVanalysis < handle
         
         % static model parameters with default values
   
-        g = 9.80665                     % (m/s2)
-        rhoPack = 2000                  % (kg/m3) particle packed bulk 
-                                        % density
-
-        mu = 2.5*1.81e-5                % (kg/m s) dynamic viscosity, u,  of particles 
-                                        % moving in air(Bicerano, Douglas 
-                                        % and Brune, 1999)
-        nu                              % (m2/s) kinematic viscosity of 
-                                        % particles moving in air  
-        Uinf = 0.01                     % (m/s) normalization velocity
+        g = 9.80665                     % (m/s2)                           
+        mu = 2.5*1.81e-5                % (kg/m s) dynamic viscosity, u
+        nu                              % (m2/s) 
+ 
+        u_o
+        v_o
+        u_original
+        v_original
+        datamax
+        datamin
+        percentleft
+        u_agw
+        v_agw
+        u_nanfilter
+        v_nanfilter
         
         % matrices for velocity values
         mean                % intermediate r-momentum state matrix (KP-04/25)
@@ -26,8 +31,6 @@ classdef PIVanalysis < handle
         % nondimensional terms
         Re                  % Reynolds number w.r.t. Uinf
         Fr                  % Freud number w.r.t Uinf
-        
-        
         % figures and tables
         vtbl            % table containing all static variables
         ubarfig         % figure showing velocity in top boundary
@@ -40,11 +43,22 @@ classdef PIVanalysis < handle
         function obj = PIVanalysis()
             % include any initializations for properties here. It will be
             % ran whenever a new class instantiation is performed.
+            load('F:\032420_AM_0.6_40_105_630_10min_4.5V_Correct.mat','u_original','v_original') %Change% 
+            %load('032420_AM_0.6_40_105_630_10min_4.5V_Correct.mat','u_original','v_original') %Change% 
+            %load('032420_AM_01_80_120_720_10min_4.5V_Correct.mat','u_original','v_original')
+            %load('4Vworkspace.mat','Utotal','Wtotal');
+            %load('6Vworkspace.mat','Utotal','Wtotal');
+            obj.u_original = u_original;
+            obj.v_original = v_original;
+            
         end
         function reInitObj(obj)
             % recomputes static variables. should be ran if any of the
             % system properties are changed externally to ensure that 
             % everything is consistent.
+            
+            %obj.u_o = obj.u_original;
+            %obj.v_o = obj.v_original;
             
 %             obj.ztop = obj.H;
 %             obj.rbar = 1e-6:obj.drbar:obj.b;          
@@ -53,11 +67,24 @@ classdef PIVanalysis < handle
 %             obj.rMaxIndex = size(obj.rbar,2);
 %             obj.zMaxIndex = size(obj.zbar,2);
         end 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
-        function checkHistogram(obj)
-            [Ny,Nx,Nt] = size(u_o);
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
+        function reshapes(obj)
+         obj.u_o = cell2mat(obj.u_original); %No filter is done within PIVLAB
+         obj.v_o = cell2mat(obj.v_original); %These values have NaNs in them
 
-            ucheck = reshape(u_o,1,Nx*Ny*Nt); vcheck = reshape(v_o,1,Nx*Ny*Nt);
+        % % Rotate Matrix
+         nlay = length(obj.u_original);
+         [r,c] = size(obj.u_o);
+        % 
+         obj.u_o   = permute(reshape(obj.u_o',[c,r/nlay,nlay]),[2,1,3]);
+         obj.v_o   = permute(reshape(obj.v_o',[c,r/nlay,nlay]),[2,1,3]);
+         
+        end
+        function checkHistogram(obj)
+            reshapes(obj);
+            [Ny,Nx,Nt] = size(obj.u_o);
+
+            ucheck = reshape(obj.u_o,1,Nx*Ny*Nt); vcheck = reshape(obj.v_o,1,Nx*Ny*Nt);
 
             figure(1)
             title('Histograms of the $u$ and w velocities---Pre-Filter')
@@ -72,22 +99,24 @@ classdef PIVanalysis < handle
             ylabel('Frequency')
             xlabel('m/s')
             
-            datamax = inputdlg('Enter a number:',...
-             'AGW Filter Max. and Min. Value', [1 50]);
-            datamin=datamax;
+            obj.datamax = str2num(cell2mat(inputdlg('Enter a number:',...
+             'AGW Filter Max. and Min. Value', [1 50])));
+            obj.datamin=-obj.datamax;
             close all
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
         function applyAGWfilter(obj)
-                        [Ny,Nx,Nt] = size(u_o); 
+            checkHistogram(obj)
+            
+            [Ny,Nx,Nt] = size(obj.u_o); 
 
-            ucheck = reshape(u_o,1,Nx*Ny*Nt); vcheck = reshape(v_o,1,Nx*Ny*Nt);
+            ucheck = reshape(obj.u_o,1,Nx*Ny*Nt); vcheck = reshape(obj.v_o,1,Nx*Ny*Nt);
 
-            u_o=permute(u_o,[3 2 1]); v_o=permute(v_o,[3 2 1]); 
+            obj.u_o=permute(obj.u_o,[3 2 1]); obj.v_o=permute(obj.v_o,[3 2 1]); 
 
-            [Nt,Ny,Nx] = size(u_o);
+            [Nt,Ny,Nx] = size(obj.u_o);
 
-             uresh = reshape(u_o,Nt*Nx,Ny); vresh = reshape(v_o,Nt*Nx,Ny);
+             uresh = reshape(obj.u_o,Nt*Nx,Ny); vresh = reshape(obj.v_o,Nt*Nx,Ny);
 
 
                 time=1:Nt*Nx;
@@ -100,8 +129,6 @@ classdef PIVanalysis < handle
                 %01_60_120_720_10min_4.5V: 0.4 and -0.4, 0.8979
                 %01_80_120_720_10min_4.5V: 0.4 and -0.4, 0.9418 and 0.9424
 
-                %datamax = 0.5; datamin = -0.5; %m/s
-
                 ufill = zeros(Ny,Nt*Nx); %creates double array with the same number of positions as the original data
                 vfill = zeros(Ny,Nt*Nx);
 
@@ -111,8 +138,8 @@ classdef PIVanalysis < handle
 
                     utemp = uresh(:,i);
                     vtemp = vresh(:,i);
-                    [udat utim] = agw_filter(utemp,time,datamax,datamin);
-                    [vdat vtim] = agw_filter(vtemp,time,datamax,datamin);
+                    [udat utim] = agw_filter(utemp,time,obj.datamax,obj.datamin);
+                    [vdat vtim] = agw_filter(vtemp,time,obj.datamax,obj.datamin);
 
 
                     %NaNs become 1000 and removed points become 1000.
@@ -155,11 +182,13 @@ classdef PIVanalysis < handle
                     end
                 end
 
-                u_agw=unewnan; v_agw=vnewnan;
+            obj.u_agw=unewnan; obj.v_agw=vnewnan;
 
             % Percentage of velocities left after the AGW filter has been applied, I think Blair said this should be 90 percent or higher
             % if the data is good
-            percentleft = length(utim)/length(time) %it is the same for all components
+            obj.percentleft = length(utim)/length(time); %it is the same for all components
+            
+            f = msgbox(num2str(obj.percentleft*100), 'Percent Remaining. Ideally 95% or more.')
 
             %----------------------
             % Histograms to compare pre and post filtering
@@ -168,12 +197,12 @@ classdef PIVanalysis < handle
             %title('Histograms of the $u$ and $w$ velocities---Pre and Post-Filter')
             subplot(2,2,1)
             hist(ucheck,100)
-            %title('Histogram of the $u$ velocities---Pre-Filter','Interpreter','Latex')
+            title('Histogram of the $u$ velocities---Pre-Filter','Interpreter','Latex')
             ylabel('Frequency')
             xlabel('$u$ (m/s)','Interpreter','Latex')
             subplot(2,2,2)
             hist(udat,100)
-            %title('Histogram of the $u$ velocities---Post-Filter','Interpreter','Latex')
+            title('Histogram of the $u$ velocities---Post-Filter','Interpreter','Latex')
             ylabel('Frequency') 
             xlabel('$u$ (m/s)','Interpreter','Latex')
             ax = gca;
@@ -188,6 +217,91 @@ classdef PIVanalysis < handle
             title('Histogram of the $w$ velocities---Post-Filter','Interpreter','Latex')
             ylabel('Frequency')
             xlabel('$w$ (m/s)','Interpreter','Latex')
+            
+            medfilter(obj)
+        end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        function medfilter(obj)
+            target = 10; %initial guess 
+            
+            [Nt,Ny,Nx] = size(obj.u_agw);
+            
+            while(1)
+     
+            m=1;
+            
+            for tt=1:Nt
+                
+
+                ut=squeeze(obj.u_agw(tt,:,:));
+                vt=squeeze(obj.v_agw(tt,:,:));
+
+                umed = mediannan(ut,3);
+                vmed = mediannan(vt,3);
+
+                flagu = abs(umed - ut) > target;
+                flagv = abs(vmed - vt) > target;
+                flag = flagu + flagv;
+                flag(flag==2)=1;
+
+                utclean = ut.*(1-flag);
+                utclean(utclean==0) = NaN;
+                vtclean = vt.*(1-flag);
+                vtclean(vtclean==0) = NaN;
+
+                uclean_save(tt,:,:) = utclean;
+                vclean_save(tt,:,:) = vtclean;
+         
+                flagged(tt,:,:) = flag;
+                
+                figure(1); %shows original data
+                hold off;
+                unewtemp = squeeze(obj.u_original(tt,:,:));
+                vnewtemp = squeeze(obj.v_original(tt,:,:));
+                quiver(unewtemp,vnewtemp,2,'b');
+                xlim([0 col])
+                ylim([0 row])
+                
+                figure(1); %shows what agw filter removes
+                hold off;
+                unewtemp = squeeze(obj.u_agw(tt,:,:));
+                vnewtemp = squeeze(obj.v_agw(tt,:,:));
+                unewtemp(unewtemp==1000)=0;
+                vnewtemp(vnewtemp==1000)=0;
+                quiver(unewtemp,vnewtemp,2,'k');
+                xlim([0 col])
+                ylim([0 row])
+                
+                figure(1);
+                hold on;
+                quiver(utclean,vtclean,2,'r'); %the values after agw and medfilter
+                xlim([0 col])
+                ylim([0 row])
+                
+                if m==3
+                    continue
+                    else    
+                    m = menu('Press yes no all','Yes','No', 'All');
+                end 
+                
+                if m==2  % yes stored as 1, no stored as 2, no has a value of 3
+                break;
+                end
+                
+            end
+            
+            %check if the target should be updated then, depending on how
+            %the plots looking 
+            target = str2num(cell2mat(inputdlg('Enter new target or 10 (to exit medfilter function):',...
+            'Target', [1 50])));
+        
+            if target==10
+               break
+            end
+            
+            end
+            obj.u_nanfilter = uclean_save;
+            obj.v_nanfilter = vclean_save;
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function permute(obj)
