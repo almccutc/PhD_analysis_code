@@ -11,17 +11,23 @@ classdef PIVanalysis < handle
         mu = 2.5*1.81e-5                % (kg/m s) dynamic viscosity, u
         nu                              % (m2/s) 
  
-        u_o
-        v_o
         u_original
         v_original
         datamax
         datamin
-        percentleft
+        original_percentleft
+        medianfilter_percentleft
+        agwpercentleft
         u_agw
         v_agw
         u_nanfilter
         v_nanfilter
+        u_mean
+        v_mean
+        u_f
+        v_f
+        u_rms
+        v_rms
         
         % matrices for velocity values
         mean                % intermediate r-momentum state matrix (KP-04/25)
@@ -68,23 +74,42 @@ classdef PIVanalysis < handle
 %             obj.zMaxIndex = size(obj.zbar,2);
         end 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
+        function allfunctions(obj)
+            reshapes(obj);
+            checkHistogram(obj);
+            applyAGWfilter(obj);
+            medfilter(obj);
+            velocityCalculations(obj);
+            %spatialspectra(obj);
+            %temporalspectra(obj);
+            
+        end    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
         function reshapes(obj)
-         obj.u_o = cell2mat(obj.u_original); %No filter is done within PIVLAB
-         obj.v_o = cell2mat(obj.v_original); %These values have NaNs in them
+         u_o = cell2mat(obj.u_original); %No filter is done within PIVLAB
+         v_o = cell2mat(obj.v_original); %These values have NaNs in them
 
-        % % Rotate Matrix
+        % Rotate Matrix
          nlay = length(obj.u_original);
-         [r,c] = size(obj.u_o);
+         [r,c] = size(u_o);
         % 
-         obj.u_o   = permute(reshape(obj.u_o',[c,r/nlay,nlay]),[2,1,3]);
-         obj.v_o   = permute(reshape(obj.v_o',[c,r/nlay,nlay]),[2,1,3]);
+         obj.u_original = permute(reshape(u_o',[c,r/nlay,nlay]),[2,1,3]);
+         obj.v_original = permute(reshape(v_o',[c,r/nlay,nlay]),[2,1,3]);
+         
+         %matches NaN values for both u and w
+         obj.u_original(isnan(obj.v_original)) = NaN;
+         obj.v_original(isnan(obj.u_original)) = NaN;
          
         end
         function checkHistogram(obj)
-            reshapes(obj);
-            [Ny,Nx,Nt] = size(obj.u_o);
+            [Ny,Nx,Nt] = size(obj.u_original);
+            total = Ny*Nx*Nt; 
+            logicarray = ~isnan(obj.u_original);
+            sumofnonNaN = sum(sum(sum(logicarray)));
+            
+            obj.original_percentleft = sumofnonNaN/total;
 
-            ucheck = reshape(obj.u_o,1,Nx*Ny*Nt); vcheck = reshape(obj.v_o,1,Nx*Ny*Nt);
+            ucheck = reshape(obj.u_original,1,Nx*Ny*Nt); vcheck = reshape(obj.v_original,1,Nx*Ny*Nt);
 
             figure(1)
             title('Histograms of the $u$ and w velocities---Pre-Filter')
@@ -106,28 +131,18 @@ classdef PIVanalysis < handle
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
         function applyAGWfilter(obj)
-            checkHistogram(obj)
             
-            [Ny,Nx,Nt] = size(obj.u_o); 
+            [Ny,Nx,Nt] = size(obj.u_original); 
 
-            ucheck = reshape(obj.u_o,1,Nx*Ny*Nt); vcheck = reshape(obj.v_o,1,Nx*Ny*Nt);
+            ucheck = reshape(obj.u_original,1,Nx*Ny*Nt); vcheck = reshape(obj.v_original,1,Nx*Ny*Nt);
 
-            obj.u_o=permute(obj.u_o,[3 2 1]); obj.v_o=permute(obj.v_o,[3 2 1]); 
+            obj.u_original=permute(obj.u_original,[3 2 1]); obj.v_original=permute(obj.v_original,[3 2 1]); 
 
-            [Nt,Ny,Nx] = size(obj.u_o);
+            [Nt,Ny,Nx] = size(obj.u_original);
 
-             uresh = reshape(obj.u_o,Nt*Nx,Ny); vresh = reshape(obj.v_o,Nt*Nx,Ny);
-
-
+            uresh = reshape(obj.u_original,Nt*Nx,Ny); vresh = reshape(obj.v_original,Nt*Nx,Ny);
+            %
                 time=1:Nt*Nx;
-                %0.6_40_105_630_10min_4.5V: 0.4 and -0.4, 0.8970
-                %0.6_20_105_630_10min_4.5V: 0.4 and -0.4, 0.9341
-                %0.6_60_105_630_10min_4.5V: 0.4 and -0.4, 0.8693
-                %0.6_80_110_660_10min_4.5V: 0.4 and -0.4, 0.8773
-                %01_20_115_690_10min_4.5V: 0.4 and -0.4, 0.8857
-                %01_40_120_720_10min_4.5V: 0.4 and -0.4, 0.8980
-                %01_60_120_720_10min_4.5V: 0.4 and -0.4, 0.8979
-                %01_80_120_720_10min_4.5V: 0.4 and -0.4, 0.9418 and 0.9424
 
                 ufill = zeros(Ny,Nt*Nx); %creates double array with the same number of positions as the original data
                 vfill = zeros(Ny,Nt*Nx);
@@ -146,49 +161,39 @@ classdef PIVanalysis < handle
                     %This uses utim/vtim to put the udat/vdat in the correct index of
                     %the original data
                     clear ufillvect
-                    ufillvect = zeros(1,Nx*Nt)+1000;
+                    ufillvect = zeros(1,Nx*Nt);
                     ufillvect(utim)=udat;
                     ufill(i,:)=ufillvect; %the data that was not filtered, udat/vdat, is put into ufill/vfill
                     %keep their same index, where all other positions, which has data
                     %that filtered out, has a 1000 value
 
                     clear vfillvect
-                    vfillvect = zeros(1,Nx*Nt)+1000;
+                    vfillvect = zeros(1,Nx*Nt);
                     vfillvect(vtim)=vdat;
                     vfill(i,:)=vfillvect;
 
                 end
+            %
+            ufill = ufill'; obj.u_agw = reshape(ufill,Nt,Ny,Nx);
+            vfill = vfill'; obj.v_agw = reshape(vfill,Nt,Ny,Nx);
+            
+            obj.u_agw(obj.u_agw==0)=NaN;
+            obj.v_agw(obj.v_agw==0)=NaN;
+            
 
-                ufill = ufill'; unew = reshape(ufill,Nt,Ny,Nx);
-
-                vfill = vfill'; vnew = reshape(vfill,Nt,Ny,Nx);
-
-                %if value is 1000, gets assigned a value of 1 at each index, otherwise is 0
-                flaguAGW0=unew==1000; flagvAGW0=vnew==1000;
-                flaggedAGW0 = flaguAGW0 + flagvAGW0;
-                flaggedAGW0(flaggedAGW0==2)=1;
-
-                unewnan = unew; vnewnan = vnew;
-
-                %sets value of index to NaN if it has a flagged value of 1
-                for tt=1:Nt
-                    for row=1:Ny
-                        for col=1:Nx
-                            if flaggedAGW0(tt,row,col) > 0
-                                unewnan(tt,row,col)=NaN;
-                                vnewnan(tt,row,col)=NaN;
-                            end
-                        end
-                    end
-                end
-
-            obj.u_agw=unewnan; obj.v_agw=vnewnan;
+            obj.u_agw(isnan(obj.v_agw)) = NaN;
+            obj.v_agw(isnan(obj.u_agw)) = NaN;
 
             % Percentage of velocities left after the AGW filter has been applied, I think Blair said this should be 90 percent or higher
             % if the data is good
-            obj.percentleft = length(utim)/length(time); %it is the same for all components
+            [Ny,Nx,Nt] = size(obj.u_original);
+            total = Ny*Nx*Nt; 
+            logicarray = ~isnan(obj.u_agw);
+            sumofnonNaN = sum(sum(sum(logicarray)));
             
-            f = msgbox(num2str(obj.percentleft*100), 'Percent Remaining. Ideally 95% or more.')
+            obj.agwpercentleft = sumofnonNaN/total; %it is the same for all components
+            
+            %f = msgbox(num2str(obj.agwpercentleft*100), 'Percent Remaining. Ideally 95% or more.')
 
             %----------------------
             % Histograms to compare pre and post filtering
@@ -217,8 +222,10 @@ classdef PIVanalysis < handle
             title('Histogram of the $w$ velocities---Post-Filter','Interpreter','Latex')
             ylabel('Frequency')
             xlabel('$w$ (m/s)','Interpreter','Latex')
+            hold off
             
-            medfilter(obj)
+            pause;
+            
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function medfilter(obj)
@@ -231,7 +238,7 @@ classdef PIVanalysis < handle
             m=1;
             
             for tt=1:Nt
-                
+                close all
 
                 ut=squeeze(obj.u_agw(tt,:,:));
                 vt=squeeze(obj.v_agw(tt,:,:));
@@ -248,130 +255,195 @@ classdef PIVanalysis < handle
                 utclean(utclean==0) = NaN;
                 vtclean = vt.*(1-flag);
                 vtclean(vtclean==0) = NaN;
-
-                uclean_save(tt,:,:) = utclean;
-                vclean_save(tt,:,:) = vtclean;
-         
-                flagged(tt,:,:) = flag;
                 
-                figure(1); %shows original data
-                hold off;
-                unewtemp = squeeze(obj.u_original(tt,:,:));
-                vnewtemp = squeeze(obj.v_original(tt,:,:));
-                quiver(unewtemp,vnewtemp,2,'b');
-                xlim([0 col])
-                ylim([0 row])
+                figure(2); %shows original data
+                uoriginal = squeeze(obj.u_original(tt,:,:));
+                voriginal = squeeze(obj.v_original(tt,:,:));
+                quiver(uoriginal,voriginal,2,'b');
+                xlim([0 Nx])
+                ylim([0 Ny])
+                hold on;
                 
-                figure(1); %shows what agw filter removes
-                hold off;
+                %figure(2); %shows what agw filter removes
                 unewtemp = squeeze(obj.u_agw(tt,:,:));
                 vnewtemp = squeeze(obj.v_agw(tt,:,:));
-                unewtemp(unewtemp==1000)=0;
-                vnewtemp(vnewtemp==1000)=0;
-                quiver(unewtemp,vnewtemp,2,'k');
-                xlim([0 col])
-                ylim([0 row])
-                
-                figure(1);
+                quiver(unewtemp,vnewtemp,2,'r');
+                xlim([0 Nx])
+                ylim([0 Ny])
                 hold on;
-                quiver(utclean,vtclean,2,'r'); %the values after agw and medfilter
-                xlim([0 col])
-                ylim([0 row])
+                
+                %figure(2);
+                quiver(utclean,vtclean,2,'k'); %the values after agw and medfilter
+                xlim([0 Nx])
+                ylim([0 Ny])
                 
                 if m==3
                     continue
                     else    
-                    m = menu('Press yes no all','Yes','No', 'All');
+                    m = menu('Yes if to continue through time, No for ew target value, All to apply filter at all time steps, Exit to stop program.','Yes','No', 'All', 'Exit');
                 end 
                 
-                if m==2  % yes stored as 1, no stored as 2, no has a value of 3
+                if m==2  % yes stored as 1, no stored as 2, no has a value of 3, exit is 4
                 break;
                 end
                 
+                if m==4
+                    break;
+                end    
+                
             end
+            
+            if m==4
+                break;
+            end 
             
             %check if the target should be updated then, depending on how
             %the plots looking 
-            target = str2num(cell2mat(inputdlg('Enter new target or 10 (to exit medfilter function):',...
+            target = str2num(cell2mat(inputdlg('Enter new target:',...
             'Target', [1 50])));
-        
-            if target==10
-               break
-            end
             
             end
             obj.u_nanfilter = uclean_save;
             obj.v_nanfilter = vclean_save;
-        end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        function permute(obj)
-            u_o = u_agw; v_o = v_agw;
-
-            u_o=permute(u_o,[1 3 2]); v_o=permute(v_o,[1 3 2]); 
-
-            u_o=permute(u_o,[2 3 1]); v_o=permute(v_o,[2 3 1]);
-
+            
+            [Ny,Nx,Nt] = size(obj.u_original);
+            total = Ny*Nx*Nt; 
+            logicarray = ~isnan(obj.u_nanfilter);
+            sumofnonNaN = sum(sum(sum(logicarray)));
+            obj.medianfilter_percentleft = sumofnonNaN/total; %it is the same for all components
+            
+            
+            close all
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function velocityCalculations(obj)
-            u_mean = nanmean(u_o,3); v_mean = nanmean(v_o,3);
-
-            u_f = u_o-u_mean; v_f = v_o-v_mean;
-
-            u_rms = sqrt(nanmean((u_f.^2),3)); v_rms = sqrt(nanmean((v_f.^2),3));
-
-            obj.tke = 0.5*(2*(u_rms.^2) + (v_rms.^2));
+            
+            % Bring in data, the is for a 3D double array, mine is 53 (height) by 79 (length) by 10,500 (in time)
+            u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
+            
+            u_o=permute(u_o,[1 3 2]); v_o=permute(v_o,[1 3 2]); 
+            u_o=permute(u_o,[2 3 1]); v_o=permute(v_o,[2 3 1]);
+            
+            obj.u_mean = nanmean(u_o,3); obj.v_mean = nanmean(v_o,3);
+            obj. u_f = u_o-obj.u_mean; obj.v_f = v_o-obj.v_mean;
+            obj.u_rms = sqrt(nanmean((obj.u_f.^2),3)); obj.v_rms = sqrt(nanmean((obj.v_f.^2),3));
+            obj.tke = 0.5*(2*(obj. u_f.^2) + (obj. v_f.^2));
             
             %Time average for each subwindow                            
             figure (1) 
             subplot(3,2,1)
-            imagesc(u_mean)
+            imagesc(obj.u_mean)
             colorbar
             caxis([-0.02,0.02])
             title('Colorbar U-Velocity (m/s)','Interpreter','Latex')
             subplot(2,2,2)
-            imagesc(v_mean)
+            imagesc(obj.v_mean)
             colorbar
             caxis([-0.02,0.02])
             title('Colorbar W-Velocity (m/s)','Interpreter','Latex')
 
             %Time rms average for each subwindow
             subplot(2,2,3)
-            imagesc(u_rms)
+            imagesc(obj.u_rms)
             colorbar
             %caxis([-0.02,0.02])
             title('Colorbar rms (m/s)')
             subplot(2,2,4)
-            imagesc(v_rms)
+            imagesc(obj.v_rms)
             colorbar
             %caxis([-0.02,0.02])
             title('Colorbar rms (m/s)')
 
             figure (2)
-            imagesc(tke)
+            imagesc(obj.tke)
             colorbar
             %caxis([-0.02,0.02])
             title('TKE (m^2/s^2)')
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+        function spatialspectra(obj)
+            %53 by 79 subwindows
+            Suutime=[];
+            a = 35; %x direction subwindow strip
+            b= 25; %y direction subwindow strip
+            calibration = s; %pixel to cm conversion
+            deltax=16; %cm% smallest subwindow overlap. 32 by 32 subwindow with a 50% overlap is 16 same as delta y
+            deltay = deltax; % in this case with a symmetric subwindow
+            Lx = 1280-deltax; %cm% distance from the middle of the first to last subwindow
+            Ly = 864-deltax; %cm% distance from the middle of the first to last subwindow
+            ks = 2*pi/deltax; %cm% 
+            deltakx = 2*pi/Lx; %between frequency points
+            deltaky = 2*pi/Ly;
+            kx= deltakx/2:deltakx:(ks-deltakx/2); %x axis values
+            ky= deltaky/2:deltaky:(ks-deltaky/2); %y axis values
+            for i = 1:nlay-10000 %number of image pairs
 
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % add any additional functions here
-        % as a general rule, try to keep the number of operations for 
-        % each method at a minimum. if a function is more than ~10 lines
-        % then it should probably be split into multiple methods.
-        % in general, the methods can be treated as a typical matlab
-        % function with the acception of the method for passing in
-        % properties. the general form for functions that have an output is
+            uspatial = u_o(a,:,i);
+            vspatial = v_o(b,:,i);  
+            Suu = fft(uspatial).*conj(fft(uspatial));
+            Svv = fft(vspatial).*conj(fft(vspatial));
+end 
+        end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+        function temporalspectra(obj)
+            u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
+            
+            u_o(isnan(u_o)) = 0; v_o(isnan(v_o)) = 0;
+
+            %436(left to right), 288(top going dowwards)
+            %so approx subwindow (18,27)
+            xlocation = 18;
+            ylocation = 27;
+
+            u = u_o;
+            v = v_o;
+            [Ny,Nx,Nt] = size(u);
+            f_s = 115; %sample frequency
+            N = Nt/10; 
+            %N=1150;
+            T = N/f_s;
+            df = f_s/N;
+            f = df/2:df:f_s-df/2;
+            fny = f(1:(length(f)/2));
+
+            tempspectraU = [];
+            tempspectraW = [];
+
+            for i =1:10 
+               U = u(xlocation,ylocation,N*i-N+1:N*i);
+               W = v(xlocation,ylocation,N*i-N+1:N*i);
+               tempspectraU(:,:,i) = ((1/(f_s*T*f_s))*abs((fft(U)).^2)); 
+               tempspectraW(:,:,i) = ((1/(f_s*T*f_s))*abs((fft(W)).^2)); 
+            end
+
+            Suu=mean(tempspectraU,3);
+            Suu=permute(Suu, [2 1]); 
+            Suu = 2.*Suu(1:length(fny));
+
+            Sww=mean(tempspectraW,3);
+            Sww=permute(Sww, [2 1]); 
+            Sww = 2.*Sww(1:length(fny));
+
+            figure(1)
+            loglog(fny,Suu, 'g')
+            xlabel('f (Hz)','FontSize',12)
+            ylabel('S_{uu}, S_{ww} (m^{2}/s^{3})','FontSize',12)
+            xlim([-inf inf]);
+            ylim([10^-5 10^-2]);
+            grid on;
+            hold on
+            loglog(fny,Sww, 'r')
+            %title({'\fontsize{14} \it Autospectral Density Function';' '},'FontWeight','Normal','Interpreter','Latex')
+             b=-8;
+             c=exp(b);
+            hold on
+            y = c*fny.^(-5/3);
+            loglog(fny,y, 'k')
+
+            legend('S_{uu}','S_{ww}', '-5/3' )
+        end
       
-        % where the inputs are just arbitrary variables that aren't defined
-        % as properties. it is typically a good practice to limit the usage
-        % of these and instead just operate with class properties. if a
-        % non-property variable is being passed into multiple functions 
-        % then it should instead be defined as a property.
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %         function animateSpeed(obj, plot_filename, rr, snapK)
 %             % generates gif that displays velocity magnitude at every time
 %             % step
