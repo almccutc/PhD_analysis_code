@@ -28,6 +28,7 @@ classdef PIVanalysis < handle
         v_f
         u_rms
         v_rms
+        target
         
         % matrices for velocity values
         mean                % intermediate r-momentum state matrix (KP-04/25)
@@ -49,7 +50,7 @@ classdef PIVanalysis < handle
         function obj = PIVanalysis()
             % include any initializations for properties here. It will be
             % ran whenever a new class instantiation is performed.
-            load('F:\032420_AM_0.6_40_105_630_10min_4.5V_Correct.mat','u_original','v_original') %Change% 
+            load('G:\J20matfiles\032420_AM_0.6_40_105_630_10min_4.5V_Correct.mat','u_original','v_original') %Change% 
             %load('032420_AM_0.6_40_105_630_10min_4.5V_Correct.mat','u_original','v_original') %Change% 
             %load('032420_AM_01_80_120_720_10min_4.5V_Correct.mat','u_original','v_original')
             %load('4Vworkspace.mat','Utotal','Wtotal');
@@ -229,7 +230,7 @@ classdef PIVanalysis < handle
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function medfilter(obj)
-            target = 10; %initial guess 
+            obj.target = 1; %initial guess 
             
             [Nt,Ny,Nx] = size(obj.u_agw);
             
@@ -246,8 +247,8 @@ classdef PIVanalysis < handle
                 umed = mediannan(ut,3);
                 vmed = mediannan(vt,3);
 
-                flagu = abs(umed - ut) > target;
-                flagv = abs(vmed - vt) > target;
+                flagu = abs(umed - ut) > obj.target;
+                flagv = abs(vmed - vt) > obj.target;
                 flag = flagu + flagv;
                 flag(flag==2)=1;
 
@@ -256,50 +257,59 @@ classdef PIVanalysis < handle
                 vtclean = vt.*(1-flag);
                 vtclean(vtclean==0) = NaN;
                 
+                uclean_save(tt,:,:) = utclean;
+                vclean_save(tt,:,:) = vtclean;
+                
+
                 figure(2); %shows original data
                 uoriginal = squeeze(obj.u_original(tt,:,:));
                 voriginal = squeeze(obj.v_original(tt,:,:));
                 quiver(uoriginal,voriginal,2,'b');
                 xlim([0 Nx])
                 ylim([0 Ny])
+                set(gcf,'Position',[700 300 800 700])
                 hold on;
                 
-                %figure(2); %shows what agw filter removes
-                unewtemp = squeeze(obj.u_agw(tt,:,:));
-                vnewtemp = squeeze(obj.v_agw(tt,:,:));
-                quiver(unewtemp,vnewtemp,2,'r');
+                %shows what agw filter removes
+                uagw = squeeze(obj.u_agw(tt,:,:));
+                vagw = squeeze(obj.v_agw(tt,:,:));
+                quiver(uagw,vagw,2,'r');
                 xlim([0 Nx])
                 ylim([0 Ny])
                 hold on;
                 
-                %figure(2);
-                quiver(utclean,vtclean,2,'k'); %the values after agw and medfilter
+                %the values after agw and medfilter
+                quiver(utclean,vtclean,2,'k'); 
                 xlim([0 Nx])
                 ylim([0 Ny])
                 
                 if m==3
                     continue
                     else    
-                    m = menu('Yes if to continue through time, No for ew target value, All to apply filter at all time steps, Exit to stop program.','Yes','No', 'All', 'Exit');
+                    m = menu('Yes if to continue through time, No for new target value, All to apply filter at all time steps, Exit to stop program.','Yes','No', 'All', 'Exit');
                 end 
                 
-                if m==2  % yes stored as 1, no stored as 2, no has a value of 3, exit is 4
-                break;
+                if m==2  % yes stored as 1, no stored as 2, all has a value of 3, exit is 4
+                    break;
                 end
                 
                 if m==4
                     break;
                 end    
+
                 
             end
             
             if m==4
                 break;
             end 
+            if m==3
+                break;
+            end 
             
             %check if the target should be updated then, depending on how
             %the plots looking 
-            target = str2num(cell2mat(inputdlg('Enter new target:',...
+            obj.target = str2num(cell2mat(inputdlg('Enter new target:',...
             'Target', [1 50])));
             
             end
@@ -310,10 +320,12 @@ classdef PIVanalysis < handle
             total = Ny*Nx*Nt; 
             logicarray = ~isnan(obj.u_nanfilter);
             sumofnonNaN = sum(sum(sum(logicarray)));
-            obj.medianfilter_percentleft = sumofnonNaN/total; %it is the same for all components
+            obj.medianfilter_percentleft = sumofnonNaN/total; 
             
             
             close all
+            
+            beep
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function velocityCalculations(obj)
@@ -328,6 +340,7 @@ classdef PIVanalysis < handle
             obj. u_f = u_o-obj.u_mean; obj.v_f = v_o-obj.v_mean;
             obj.u_rms = sqrt(nanmean((obj.u_f.^2),3)); obj.v_rms = sqrt(nanmean((obj.v_f.^2),3));
             obj.tke = 0.5*(2*(obj. u_f.^2) + (obj. v_f.^2));
+            obj.tke = nanmean(obj.tke,3);
             
             %Time average for each subwindow                            
             figure (1) 
