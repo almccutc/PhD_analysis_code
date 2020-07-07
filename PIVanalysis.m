@@ -334,7 +334,7 @@ classdef PIVanalysis < handle
             u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
             
             u_o=permute(u_o,[1 3 2]); v_o=permute(v_o,[1 3 2]); 
-            u_o=permute(u_o,[2 3 1]); v_o=permute(v_o,[2 3 1]);
+            u_o=permute(u_o,[2 3 1]); v_o=permute(v_o,[2 1 3]);
             
             obj.u_mean = nanmean(u_o,3); obj.v_mean = nanmean(v_o,3);
             obj. u_f = u_o-obj.u_mean; obj.v_f = v_o-obj.v_mean;
@@ -456,6 +456,63 @@ end
             legend('S_{uu}','S_{ww}', '-5/3' )
         end
       
+        function integrallength(obj)        
+            u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
+            
+            u_o=permute(u_o,[1 3 2]); v_o=permute(v_o,[1 3 2]); 
+            %u_o=permute(u_o,[2 3 1]); v_o=permute(v_o,[2 1 3]);
+            
+            subwindow=32;    %pixels between subwindow centers 
+            res=0.0105;
+            lowb=1;
+            uppb=64; %not sure?
+            
+            [time height width]=size(u_o);
+            height_subw=height:-1:1;
+            height_subw=height_subw.*res.*subwindow; %calibrate to cm
+            
+            center=(width+1)/2;
+            radd=1:(center-2);
+            radd=radd.*subwindow.*res;
+            radd2(2:uppb)=radd.*2;
+            radd2(1)=0;
+
+            %autocorrelation calculation          
+            for row=1:height-7 %height-9 1:height-2, can't do height b/c otherwise it crashes...
+                for radius=1:center-2
+                    %calculate a(r) from VarianoCowen2008 formula 4.1
+                    au(row,radius)=nanmean(udata(:,row,center-radius).*udata(:,row,center+radius))...
+                        ./sqrt(nanmean(udata(:,row,center-radius).^2).*nanmean(udata(:,row,center+radius).^2));
+
+                    av(row,radius)=nanmean(vdata(:,row,center-radius).*vdata(:,row,center+radius))...
+                        ./sqrt(nanmean(vdata(:,row,center-radius).^2).*nanmean(vdata(:,row,center+radius).^2));
+
+                end
+            end
+                auplot(2:uppb)=au(row,:);
+                auplot(1)=1;
+                figure(120)
+                hold off;
+                plot(radd2,auplot,'b*');
+        %         title(row);
+                hold on;
+                grid on;
+        %         xlim([0 10])
+        %         ylim([0 1]);
+            
+                newExpFuncG=@(rr,ll) exp(-rr./ll).*(1-(rr./(2.*ll)));          % Defines anon. func.
+                L0=6;                                         % Starting guess for L
+                g=@(ll)sum((avplot(lowb:uppb)-newExpFuncG(radd2(lowb:uppb),ll)).^2,2);            % Anon. function to be minimized
+                LstarG(kp,row)=fminunc(g,L0);                            % Minimize to find Lstar!
+                YhatG=newExpFuncG(radd2(lowb:uppb),LstarG(kp,row));                       % Predict values of Y
+                Resid=YhatG-avplot(lowb:uppb);                                   % Calc. residuals
+                SSR=sum(Resid.^2,2);                            % Sum of Squared Residuals
+                SSE=sum((avplot(lowb:uppb)-mean(avplot(lowb:uppb))).^2);                        % Sum of Squared Errors
+                RsquaredG(kp,row)=1-(SSR/SSE);
+
+            
+            
+        end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %         function animateSpeed(obj, plot_filename, rr, snapK)
 %             % generates gif that displays velocity magnitude at every time
