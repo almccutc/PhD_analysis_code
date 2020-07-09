@@ -16,25 +16,24 @@ classdef PIVanalysis < handle
         datamax
         datamin
         original_percentleft
-        medianfilter_percentleft
         agwpercentleft
+        medianfilter_percentleft
+        interpolated_percentleft
         u_agw
         v_agw
         u_nanfilter
         v_nanfilter
+        u_interpolated
+        v_interpolated
         u_mean
         v_mean
         u_f
         v_f
         u_rms
         v_rms
+        tke
         target
-        
-        % matrices for velocity values
-        mean                % intermediate r-momentum state matrix (KP-04/25)
-        fluctuating         % intermediate z-momentum state matrix (KP-04/25)
-        rms                 % intermediate r-momentum advection operator 
-        tke                    % state matrix (KP-04-25)                            
+                          
         % nondimensional terms
         Re                  % Reynolds number w.r.t. Uinf
         Fr                  % Freud number w.r.t Uinf
@@ -53,10 +52,10 @@ classdef PIVanalysis < handle
             load('G:\J20matfiles\032420_AM_0.6_40_105_630_10min_4.5V_Correct.mat','u_original','v_original') %Change% 
             %load('032420_AM_0.6_40_105_630_10min_4.5V_Correct.mat','u_original','v_original') %Change% 
             %load('032420_AM_01_80_120_720_10min_4.5V_Correct.mat','u_original','v_original')
-            %load('4Vworkspace.mat','Utotal','Wtotal');
+            %load('4Vworkspace.mat','Utotal','Wtotal'); 
             %load('6Vworkspace.mat','Utotal','Wtotal');
-            obj.u_original = u_original;
-            obj.v_original = v_original;
+            obj.u_original = u_original(1:20,:,:);
+            obj.v_original = v_original(1:20,:,:);
             
         end
         function reInitObj(obj)
@@ -81,6 +80,7 @@ classdef PIVanalysis < handle
             applyAGWfilter(obj);
             medfilter(obj);
             velocityCalculations(obj);
+            delaunyinterpolation(obj); 
             %spatialspectra(obj);
             %temporalspectra(obj);
             
@@ -240,7 +240,7 @@ classdef PIVanalysis < handle
             
             for tt=1:Nt
                 close all
-
+                tt
                 ut=squeeze(obj.u_agw(tt,:,:));
                 vt=squeeze(obj.v_agw(tt,:,:));
 
@@ -316,6 +316,7 @@ classdef PIVanalysis < handle
             obj.u_nanfilter = uclean_save;
             obj.v_nanfilter = vclean_save;
             
+            %checks for percent remaining from the original data
             [Ny,Nx,Nt] = size(obj.u_original);
             total = Ny*Nx*Nt; 
             logicarray = ~isnan(obj.u_nanfilter);
@@ -327,6 +328,51 @@ classdef PIVanalysis < handle
             
             beep
         end
+        
+        function delaunyinterpolation(obj) 
+            
+            unan = obj.obj.u_nanfilter;
+            vnan = obj.obj.v_nanfilter;
+            
+            [Nt, Ny, Nx] = size(unan);
+            
+            %replace any corner NaNs with the value of the median of existing corners
+            %so that interpolation if inner parts can take place
+
+            %upper left
+            U_UL=nanmedian(unan(:,1,1));
+            V_UL=nanmedian(vnan(:,1,1));
+            %upper right
+            U_UR=nanmedian(unan(:,1,Nx));
+            V_UR=nanmedian(vnan(:,1,Nx));
+            %lower left
+            U_LL=nanmedian(unan(:,Ny,1));
+            V_LL=nanmedian(vnan(:,Ny,1));
+            %lower right
+            U_LR=nanmedian(unan(:,Ny,Nx));
+            V_LR=nanmedian(vnan(:,Ny,Nx));
+            
+            
+            for tt=1:Nt
+                tt
+                unan_temp=squeeze(unan(tt,:,:));
+                vnan_temp=squeeze(vnan(tt,:,:));
+                [uuu,vvv] = fillNaNsTemp(unan_temp,vnan_temp, U_UL, U_UR, U_LL, U_LR, V_UL, V_UR, V_LL, V_LR);
+                u_interp(tt,:,:)=uuu;
+                v_interp(tt,:,:)=vvv;
+            end
+            
+            obj.u_interpolated = u_interp(:,:,:);
+            obj.v_interpolated = v_interp(:,:,:);    
+            
+            [Ny,Nx,Nt] = size(obj.u_original);
+            total = Ny*Nx*Nt; 
+            logicarray = ~isnan(obj.u_interpolated);
+            sumofnonNaN = sum(sum(sum(logicarray)));
+            obj.interpolated_percentleft = sumofnonNaN/total;
+            
+            beep
+        end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function velocityCalculations(obj)
             
@@ -334,13 +380,13 @@ classdef PIVanalysis < handle
             u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
             
             u_o=permute(u_o,[1 3 2]); v_o=permute(v_o,[1 3 2]); 
-            u_o=permute(u_o,[2 3 1]); v_o=permute(v_o,[2 1 3]);
+            u_o=permute(u_o,[2 1 3]); v_o=permute(v_o,[2 1 3]);
             
             obj.u_mean = nanmean(u_o,3); obj.v_mean = nanmean(v_o,3);
             obj. u_f = u_o-obj.u_mean; obj.v_f = v_o-obj.v_mean;
             obj.u_rms = sqrt(nanmean((obj.u_f.^2),3)); obj.v_rms = sqrt(nanmean((obj.v_f.^2),3));
-            obj.tke = 0.5*(2*(obj. u_f.^2) + (obj. v_f.^2));
-            obj.tke = nanmean(obj.tke,3);
+            tke = 0.5*(2*(obj. u_f.^2) + (obj. v_f.^2));
+            obj.tke = nanmean(tke,3);
             
             %Time average for each subwindow                            
             figure (1) 
@@ -372,6 +418,9 @@ classdef PIVanalysis < handle
             colorbar
             %caxis([-0.02,0.02])
             title('TKE (m^2/s^2)')
+            
+            pause
+            close all
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
         function spatialspectra(obj)
