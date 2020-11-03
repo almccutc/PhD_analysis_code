@@ -54,8 +54,9 @@ classdef PIVanalysis < handle
             %load('032420_AM_01_80_120_720_10min_4.5V_Correct.mat','u_original','v_original')
             %load('4Vworkspace.mat','Utotal','Wtotal'); 
             %load('6Vworkspace.mat','Utotal','Wtotal');
-            obj.u_original = u_original(1:20,:,:);
-            obj.v_original = v_original(1:20,:,:);
+            a=10;
+            obj.u_original = u_original(1:a,:,:);
+            obj.v_original = v_original(1:a,:,:);
             
         end
         function reInitObj(obj)
@@ -82,7 +83,7 @@ classdef PIVanalysis < handle
             velocityCalculations(obj);
             delaunyinterpolation(obj); 
             %spatialspectra(obj);
-            %temporalspectra(obj);
+            temporalspectra(obj);
             
         end    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
@@ -108,7 +109,7 @@ classdef PIVanalysis < handle
             logicarray = ~isnan(obj.u_original);
             sumofnonNaN = sum(sum(sum(logicarray)));
             
-            obj.original_percentleft = sumofnonNaN/total;
+            obj.original_percentleft = (sumofnonNaN/total)*100;
 
             ucheck = reshape(obj.u_original,1,Nx*Ny*Nt); vcheck = reshape(obj.v_original,1,Nx*Ny*Nt);
 
@@ -184,6 +185,9 @@ classdef PIVanalysis < handle
 
             obj.u_agw(isnan(obj.v_agw)) = NaN;
             obj.v_agw(isnan(obj.u_agw)) = NaN;
+            
+            [Nt,Ny,Nx] = size(obj.v_agw);
+            uaftercheck = reshape(obj.v_agw,1,Nx*Ny*Nt); vaftercheck = reshape(obj.v_agw,1,Nx*Ny*Nt);
 
             % Percentage of velocities left after the AGW filter has been applied, I think Blair said this should be 90 percent or higher
             % if the data is good
@@ -192,7 +196,7 @@ classdef PIVanalysis < handle
             logicarray = ~isnan(obj.u_agw);
             sumofnonNaN = sum(sum(sum(logicarray)));
             
-            obj.agwpercentleft = sumofnonNaN/total; %it is the same for all components
+            obj.agwpercentleft = (sumofnonNaN/total)*100; %it is the same for all components
             
             %f = msgbox(num2str(obj.agwpercentleft*100), 'Percent Remaining. Ideally 95% or more.')
 
@@ -202,27 +206,28 @@ classdef PIVanalysis < handle
             figure(1)
             %title('Histograms of the $u$ and $w$ velocities---Pre and Post-Filter')
             subplot(2,2,1)
+            
             hist(ucheck,100)
             title('Histogram of the $u$ velocities---Pre-Filter','Interpreter','Latex')
             ylabel('Frequency')
             xlabel('$u$ (m/s)','Interpreter','Latex')
             subplot(2,2,2)
-            hist(udat,100)
+            hist(uaftercheck,100)
             title('Histogram of the $u$ velocities---Post-Filter','Interpreter','Latex')
             ylabel('Frequency') 
             xlabel('$u$ (m/s)','Interpreter','Latex')
-            ax = gca;
-            ax.YAxis.Exponent = 3;
             subplot(2,2,3)
             hist(vcheck,100)
             title('Histogram of the $w$ velocities---Pre-Filter','Interpreter','Latex')
             ylabel('Frequency')
             xlabel('$w$ (m/s)','Interpreter','Latex')
             subplot(2,2,4)
-            hist(vdat,100)
+            hist(vaftercheck,100)
             title('Histogram of the $w$ velocities---Post-Filter','Interpreter','Latex')
             ylabel('Frequency')
             xlabel('$w$ (m/s)','Interpreter','Latex')
+%             ax = gca;
+%             ax.YAxis.Exponent = 3;
             hold off
             
             pause;
@@ -230,15 +235,21 @@ classdef PIVanalysis < handle
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function medfilter(obj)
-            obj.target = 1; %initial guess 
+            obj.target = 0.15; %initial guess 
             
+          
+          
             [Nt,Ny,Nx] = size(obj.u_agw);
-            
-            while(1)
-     
             m=1;
-            
-            for tt=1:Nt
+            while(1)
+            %selecttt = 0;
+            if m==5
+                ttstart = selecttt; 
+            else
+                m=1;
+                ttstart=1;
+            end
+            for tt=ttstart:Nt
                 close all
                 tt
                 ut=squeeze(obj.u_agw(tt,:,:));
@@ -264,7 +275,8 @@ classdef PIVanalysis < handle
                 figure(2); %shows original data
                 uoriginal = squeeze(obj.u_original(tt,:,:));
                 voriginal = squeeze(obj.v_original(tt,:,:));
-                quiver(uoriginal,voriginal,2,'b');
+                scale_factor = 1;
+                h1=quiver(uoriginal*scale_factor,voriginal*scale_factor,'b','AutoScale','off');
                 xlim([0 Nx])
                 ylim([0 Ny])
                 set(gcf,'Position',[700 300 800 700])
@@ -273,20 +285,39 @@ classdef PIVanalysis < handle
                 %shows what agw filter removes
                 uagw = squeeze(obj.u_agw(tt,:,:));
                 vagw = squeeze(obj.v_agw(tt,:,:));
-                quiver(uagw,vagw,2,'r');
+                h2= quiver(uagw*scale_factor,vagw*scale_factor,'r','AutoScale','off');
                 xlim([0 Nx])
                 ylim([0 Ny])
                 hold on;
                 
                 %the values after agw and medfilter
-                quiver(utclean,vtclean,2,'k'); 
+                h3 = quiver(utclean*scale_factor,vtclean*scale_factor,'k','AutoScale','off'); 
                 xlim([0 Nx])
                 ylim([0 Ny])
+                title(['Time step: ', num2str(tt), ' out of ', num2str(Nt), '. Target: ', num2str(obj.target)])
+                lgd = legend('AGW','Median','Remaining','Location','northeastoutside');
+                
+                hold off
+                scale=3;
+                hU1 = get(h1,'UData');
+                hV1 = get(h1,'VData');
+                set(h1,'UData',scale*hU1,'VData',scale*hV1)
+                hU2 = get(h2,'UData');
+                hV2 = get(h2,'VData');
+                set(h2,'UData',scale*hU2,'VData',scale*hV2)
+                hU3 = get(h3,'UData');
+                hV3 = get(h3,'VData');
+                set(h3,'UData',scale*hU3,'VData',scale*hV3)                
                 
                 if m==3
-                    continue
-                    else    
-                    m = menu('Yes if to continue through time, No for new target value, All to apply filter at all time steps, Exit to stop program.','Yes','No', 'All', 'Exit');
+%                     if tt == selecttt
+%                         m = menu('Yes if to continue through time, No for new target value (originally 0.15), All to apply filter at all time steps, Exit to stop program., Skip to TimeStep','Yes','No', 'All', 'Exit', 'Select T.S.');
+%                     else
+%                         continue
+%                     end
+                    continue    
+                else    
+                    m = menu('Yes if to continue through time, No for new target value (originally 0.15), All to apply filter at all time steps, Exit to stop program., Skip to TimeStep','Yes','No', 'All', 'Exit', 'Select T.S.');
                 end 
                 
                 if m==2  % yes stored as 1, no stored as 2, all has a value of 3, exit is 4
@@ -296,21 +327,34 @@ classdef PIVanalysis < handle
                 if m==4
                     break;
                 end    
+                
+                if m==5
+%                      selecttt = str2num(cell2mat(inputdlg('Enter new time step:',...
+%             'Skip to this time step', [1 50])));
+%                     m=3;
+                    break;
+                end 
 
                 
             end
-            
             if m==4
                 break;
             end 
             if m==3
                 break;
             end 
+            if m==5
+                selecttt = str2num(cell2mat(inputdlg('Enter new time step:',...
+             'Skip to this time step', [1 50])));
+            else
+                obj.target = str2num(cell2mat(inputdlg('Enter new target:',...
+            'Target', [1 50])));
+            end 
+
             
             %check if the target should be updated then, depending on how
             %the plots looking 
-            obj.target = str2num(cell2mat(inputdlg('Enter new target:',...
-            'Target', [1 50])));
+            
             
             end
             obj.u_nanfilter = uclean_save;
@@ -321,18 +365,18 @@ classdef PIVanalysis < handle
             total = Ny*Nx*Nt; 
             logicarray = ~isnan(obj.u_nanfilter);
             sumofnonNaN = sum(sum(sum(logicarray)));
-            obj.medianfilter_percentleft = sumofnonNaN/total; 
+            obj.medianfilter_percentleft = (sumofnonNaN/total)*100; 
             
             
             close all
             
             beep
         end
-        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
         function delaunyinterpolation(obj) 
             
-            unan = obj.obj.u_nanfilter;
-            vnan = obj.obj.v_nanfilter;
+            unan = obj.u_nanfilter;
+            vnan = obj.v_nanfilter;
             
             [Nt, Ny, Nx] = size(unan);
             
@@ -360,7 +404,35 @@ classdef PIVanalysis < handle
                 [uuu,vvv] = fillNaNsTemp(unan_temp,vnan_temp, U_UL, U_UR, U_LL, U_LR, V_UL, V_UR, V_LL, V_LR);
                 u_interp(tt,:,:)=uuu;
                 v_interp(tt,:,:)=vvv;
-            end
+                
+%                 scale_factor = 1;
+%                 figure(3)
+% 
+%                 h1 = quiver(uuu*scale_factor,vvv*scale_factor,'r','AutoScale','off'); 
+%                 xlim([0 Nx])
+%                 ylim([0 Ny]) 
+%                 hold on;
+%                 
+%                 unanf = squeeze(obj.u_nanfilter(tt,:,:));
+%                 vnanf = squeeze(obj.v_nanfilter(tt,:,:));
+%                 h2 = quiver(unanf*scale_factor,vnanf*scale_factor,'k','AutoScale','off'); 
+%                 xlim([0 Nx])
+%                 ylim([0 Ny])
+%                 title(['Time step: ', num2str(tt), ' out of ', num2str(Nt)])
+%                 lgd = legend('Interpolated','Filtered','Location','northeastoutside');
+%                 
+%                 hold off
+%                 scale=3;
+%                 hU1 = get(h1,'UData');
+%                 hV1 = get(h1,'VData');
+%                 set(h1,'UData',scale*hU1,'VData',scale*hV1)
+%                 hU2 = get(h2,'UData');
+%                 hV2 = get(h2,'VData');
+%                 set(h2,'UData',scale*hU2,'VData',scale*hV2)
+%                 
+%                 pause
+                close all
+            end      
             
             obj.u_interpolated = u_interp(:,:,:);
             obj.v_interpolated = v_interp(:,:,:);    
@@ -369,7 +441,7 @@ classdef PIVanalysis < handle
             total = Ny*Nx*Nt; 
             logicarray = ~isnan(obj.u_interpolated);
             sumofnonNaN = sum(sum(sum(logicarray)));
-            obj.interpolated_percentleft = sumofnonNaN/total;
+            obj.interpolated_percentleft = (sumofnonNaN/total)*100;
             
             beep
         end
@@ -379,8 +451,10 @@ classdef PIVanalysis < handle
             % Bring in data, the is for a 3D double array, mine is 53 (height) by 79 (length) by 10,500 (in time)
             u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
             
-            u_o=permute(u_o,[1 3 2]); v_o=permute(v_o,[1 3 2]); 
-            u_o=permute(u_o,[2 1 3]); v_o=permute(v_o,[2 1 3]);
+            u_o=permute(u_o,[3 2 1]); v_o=permute(v_o,[3 2 1]); 
+
+            
+            [Ny,Nx,Nt] = size(u_o);
             
             obj.u_mean = nanmean(u_o,3); obj.v_mean = nanmean(v_o,3);
             obj. u_f = u_o-obj.u_mean; obj.v_f = v_o-obj.v_mean;
@@ -424,11 +498,16 @@ classdef PIVanalysis < handle
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
         function spatialspectra(obj)
+            
+            u_o = obj.u_interpolated; v_o = obj.v_interpolated;
+            
+            u_o=permute(u_o,[3 2 1]); v_o=permute(v_o,[3 2 1]);             
+            
             %53 by 79 subwindows
             Suutime=[];
             a = 35; %x direction subwindow strip
             b= 25; %y direction subwindow strip
-            calibration = s; %pixel to cm conversion
+            %calibration = s; %pixel to cm conversion
             deltax=16; %cm% smallest subwindow overlap. 32 by 32 subwindow with a 50% overlap is 16 same as delta y
             deltay = deltax; % in this case with a symmetric subwindow
             Lx = 1280-deltax; %cm% distance from the middle of the first to last subwindow
@@ -438,19 +517,23 @@ classdef PIVanalysis < handle
             deltaky = 2*pi/Ly;
             kx= deltakx/2:deltakx:(ks-deltakx/2); %x axis values
             ky= deltaky/2:deltaky:(ks-deltaky/2); %y axis values
+            
             for i = 1:nlay-10000 %number of image pairs
 
-            uspatial = u_o(a,:,i);
-            vspatial = v_o(b,:,i);  
-            Suu = fft(uspatial).*conj(fft(uspatial));
-            Svv = fft(vspatial).*conj(fft(vspatial));
-end 
+                uspatial = u_o(a,:,i);
+                vspatial = v_o(b,:,i);  
+                Suu = fft(uspatial).*conj(fft(uspatial));
+                Svv = fft(vspatial).*conj(fft(vspatial));
+            end 
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
-        function temporalspectra(obj)
-            u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
+        function temporalspectra(obj) %this mostly works but there are issues with the number of time steps
+            %right it is set to ensemble average of 10 runs
+            u_o = obj.u_interpolated; v_o = obj.v_interpolated;
             
-            u_o(isnan(u_o)) = 0; v_o(isnan(v_o)) = 0;
+            u_o=permute(u_o,[3 2 1]); v_o=permute(v_o,[3 2 1]); 
+            
+            %u_o(isnan(u_o)) = 0; v_o(isnan(v_o)) = 0;
 
             %436(left to right), 288(top going dowwards)
             %so approx subwindow (18,27)
@@ -459,8 +542,8 @@ end
 
             u = u_o;
             v = v_o;
-            [Ny,Nx,Nt] = size(u);
-            f_s = 115; %sample frequency
+            [Nx,Ny,Nt] = size(u);
+            f_s = 105; %sample frequency
             N = Nt/10; 
             %N=1150;
             T = N/f_s;
@@ -471,6 +554,7 @@ end
             tempspectraU = [];
             tempspectraW = [];
 
+            %this is done as an ensemble average
             for i =1:10 
                U = u(xlocation,ylocation,N*i-N+1:N*i);
                W = v(xlocation,ylocation,N*i-N+1:N*i);
@@ -504,7 +588,7 @@ end
 
             legend('S_{uu}','S_{ww}', '-5/3' )
         end
-      
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%      
         function integrallength(obj)        
             u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
             
@@ -560,6 +644,36 @@ end
                 RsquaredG(kp,row)=1-(SSR/SSE);
 
             
+            
+        end
+        function dissipation(obj)  
+            %dissipation is calculated using the direct method
+            
+            %integrated dissipation spectrum
+            % eta is in mm, PIV resolution in mm
+            R = deltax/eta;
+            x_pos = 2*pi/R;
+            % using x position to go up and across
+            figure(2)
+            plot(f,Gain, '-.b') % dissipation spectra
+            hold on
+            plot(f,G2, '--r') % integrated dissipation spectrum
+            xlabel('k_\eta')
+            ylabel('D(k)/u^3_\eta, \epsilon(0,k)/\epsilon_m')
+            title('Normalized dissipation spectrum and cumulative dissipation')
+            legend('Normalized dissipation spectrum','Cumulative dissipation')
+            
+            %Kolmogorov length and time scales
+            %time (sec)
+            tau_kt = (nu/epsilon)^0.5;
+            %length (cm)
+            eta_kl = (nu^3/epsilon)^0.25;
+            
+            % Taylor microscale and Taylor Scale Reynolds number
+            %Taylor microscale (centimeters) 
+            lambda_tm  = sqrt(10)*eta_kl^(2/3)* integral^(1/3);
+            %Taylor scale Reynolds number
+            Re_\lambda = \left({2 \over 3}k \right)\sqrt{{15 \over \nu \epsilon}}
             
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
