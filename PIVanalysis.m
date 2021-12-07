@@ -33,6 +33,8 @@ classdef PIVanalysis < handle
         v_rms
         tke
         target
+        A
+        
                           
         % nondimensional terms
         Re                  % Reynolds number w.r.t. Uinf
@@ -49,14 +51,22 @@ classdef PIVanalysis < handle
         function obj = PIVanalysis()
             % include any initializations for properties here. It will be
             % ran whenever a new class instantiation is performed.
-            load('G:\J20matfiles\032420_AM_0.6_40_105_630_10min_4.5V_Correct.mat','u_original','v_original') %Change% 
+            %load('C:\Users\alm6576\Desktop\PIVlab data\PIVlab_042021_1sec_4_5V','u_original','v_original') %Change% 
+            load('G:\J 20 All jets 2021\4 volts 1 sec 40\PIVlab','u_original','v_original')
+            %load('C:\Users\alm6576\Desktop\PIVlab data\PIVlab_042021_06sec_4V','u_original','v_original')
+            %load('C:\Users\alm6576\Downloads\Filter','A')
             %load('032420_AM_0.6_40_105_630_10min_4.5V_Correct.mat','u_original','v_original') %Change% 
             %load('032420_AM_01_80_120_720_10min_4.5V_Correct.mat','u_original','v_original')
             %load('4Vworkspace.mat','Utotal','Wtotal'); 
             %load('6Vworkspace.mat','Utotal','Wtotal');
-            a=10;
-            obj.u_original = u_original(1:a,:,:);
-            obj.v_original = v_original(1:a,:,:);
+%             a=1258;
+%              obj.u_original = u_original(1:2:a,:,:); %for the piv lab error
+%              obj.v_original = v_original(1:2:a,:,:);
+
+         obj.u_original = u_original;
+         obj.v_original = v_original;
+% 
+%             obj.A = A;
             
         end
         function reInitObj(obj)
@@ -76,27 +86,20 @@ classdef PIVanalysis < handle
         end 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
         function allfunctions(obj)
-            reshapes(obj);
+            reshapes(obj); % %this works well for PIVlab sessions
             checkHistogram(obj);
             applyAGWfilter(obj);
-            medfilter(obj);
-            velocityCalculations(obj);
-            delaunyinterpolation(obj); 
+            %onlymedfilter(obj);
+            %velocityCalculations(obj);
+            %delaunyinterpolation(obj); 
             %spatialspectra(obj);
-            temporalspectra(obj);
+            %temporalspectra(obj);
             
         end    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
         function reshapes(obj)
-         u_o = cell2mat(obj.u_original); %No filter is done within PIVLAB
-         v_o = cell2mat(obj.v_original); %These values have NaNs in them
-
-        % Rotate Matrix
-         nlay = length(obj.u_original);
-         [r,c] = size(u_o);
-        % 
-         obj.u_original = permute(reshape(u_o',[c,r/nlay,nlay]),[2,1,3]);
-         obj.v_original = permute(reshape(v_o',[c,r/nlay,nlay]),[2,1,3]);
+         obj.u_original = cell2mat(permute(obj.u_original',[1,3,2])); %No filter is done within PIVLAB
+         obj.v_original = cell2mat(permute(obj.v_original',[1,3,2])); %Has NaNs
          
          %matches NaN values for both u and w
          obj.u_original(isnan(obj.v_original)) = NaN;
@@ -233,12 +236,157 @@ classdef PIVanalysis < handle
             pause;
             
         end
+        function onlymedfilter(obj) % for K PIVlab data
+            obj.target = 4; %initial guess 
+            
+            obj.u_original = obj.u_original(35:186, 1:161, :); %to do the needed reshape
+            obj.v_original = obj.v_original(35:186, 1:161, :);
+            
+           %[Nt,Ny,Nx] = size(obj.u_original);
+           [Ny,Nx,Nt] = size(obj.u_original);
+           
+            m=1;
+            while(1)
+            %selecttt = 0;
+            if m==5
+                ttstart = selecttt; 
+            else 
+                m=1;
+                ttstart=1;
+            end
+            for tt=ttstart:Nt
+                close all
+                tt
+                
+%                 ut=squeeze(obj.u_original(tt,:,:));
+%                 vt=squeeze(obj.v_original(tt,:,:));
+                
+                ut=squeeze(flip(obj.u_original(:,:,tt)));
+                vt=squeeze(flip(obj.v_original(:,:,tt)));
+
+                umed = mediannan(ut,3);
+                vmed = mediannan(vt,3);
+
+                flagu = abs(umed - ut) > obj.target;
+                flagv = abs(vmed - vt) > obj.target;
+                flag = flagu + flagv;
+                flag(flag==2)=1;
+
+                utclean = ut.*(1-flag);
+                utclean(utclean==0) = NaN;
+                vtclean = vt.*(1-flag);
+                vtclean(vtclean==0) = NaN;
+                
+%                 uclean_save(tt,:,:) = utclean;
+%                 vclean_save(tt,:,:) = vtclean;
+                uclean_save(:,:,tt) = utclean;
+                vclean_save(:,:,tt) = vtclean;
+                
+
+                figure(2); %shows original data
+%                 uoriginal = squeeze(obj.u_original(tt,:,:));
+%                 voriginal = squeeze(obj.v_original(tt,:,:));
+                uoriginal = squeeze(flip(obj.u_original(:,:,tt)));
+                voriginal = squeeze(flip(obj.v_original(:,:,tt)));
+                
+                scale_factor = 0.1;
+                h1=quiver(uoriginal*scale_factor.*(flip(obj.A)),voriginal*scale_factor.*(flip(obj.A)),'r','AutoScale','off');
+                xlim([0 Nx])
+                ylim([0 Ny])
+                set(gcf,'Position',[700 300 800 700])
+                hold on;
+                
+%                 %shows what agw filter removes
+%                 uagw = squeeze(obj.u_agw(tt,:,:));
+%                 vagw = squeeze(obj.v_agw(tt,:,:));
+%                 h2= quiver(uagw*scale_factor,vagw*scale_factor,'r','AutoScale','off');
+%                 xlim([0 Nx])
+%                 ylim([0 Ny])
+%                 hold on;
+                
+                %the values after medfilter
+                h3 = quiver(utclean*scale_factor.*(flip(obj.A)),vtclean*scale_factor.*(flip(obj.A)),'k','AutoScale','off'); 
+                xlim([0 Nx])
+                ylim([0 Ny])
+                title(['Time step: ', num2str(tt), ' out of ', num2str(Nt), '. Target: ', num2str(obj.target)])
+                lgd = legend('Original','AfterMedian','Location','northeastoutside');
+                
+                hold off
+                scale=3;
+                hU1 = get(h1,'UData');
+                hV1 = get(h1,'VData');
+                set(h1,'UData',scale*hU1,'VData',scale*hV1)
+%                 hU2 = get(h2,'UData');
+%                 hV2 = get(h2,'VData');
+%                 set(h2,'UData',scale*hU2,'VData',scale*hV2)
+                hU3 = get(h3,'UData');
+                hV3 = get(h3,'VData');
+                set(h3,'UData',scale*hU3,'VData',scale*hV3)                
+                
+                if m==3
+                    ttstart=1;
+                    continue    
+                else    
+                    m = menu('Yes if to continue through time, No for new target value (originally 0.15), All to apply filter at all time steps (reset to T.S. =1 first), Exit to stop program., Skip to TimeStep','Yes','No', 'All', 'Exit', 'Select T.S.');
+                end 
+                
+                if m==2  % yes stored as 1, no stored as 2, all has a value of 3, exit is 4
+                    break;
+                end
+                
+                if m==4
+                    break;
+                end    
+                
+                if m==5
+%                      selecttt = str2num(cell2mat(inputdlg('Enter new time step:',...
+%             'Skip to this time step', [1 50])));
+%                     m=3;
+                    break;
+                end 
+
+                
+            end
+            if m==4
+                break;
+            end 
+            if m==3
+                break;
+            end 
+            if m==5
+                selecttt = str2num(cell2mat(inputdlg('Enter new time step:',...
+             'Skip to this time step', [1 50])));
+            else
+                obj.target = str2num(cell2mat(inputdlg('Enter new target:',...
+            'Target', [1 50])));
+            end 
+ 
+            %check if the target should be updated then, depending on how
+            %the plots looking 
+            
+            end
+            obj.u_nanfilter = uclean_save;
+            obj.v_nanfilter = vclean_save;
+            
+            obj.u_nanfilter = obj.u_nanfilter.*(flip(obj.A));
+            obj.v_nanfilter = obj.v_nanfilter.*(flip(obj.A));
+            
+            %checks for percent remaining from the original data
+            [Ny,Nx,Nt] = size(obj.u_original);
+            total = Ny*Nx*Nt; 
+            logicarray = ~isnan(obj.u_nanfilter);
+            sumofnonNaN = sum(sum(sum(logicarray)));
+            obj.medianfilter_percentleft = (sumofnonNaN/total)*100; 
+            
+            
+            close all
+            
+            beep
+        end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function medfilter(obj)
             obj.target = 0.15; %initial guess 
             
-          
-          
             [Nt,Ny,Nx] = size(obj.u_agw);
             m=1;
             while(1)
@@ -673,7 +821,7 @@ classdef PIVanalysis < handle
             %Taylor microscale (centimeters) 
             lambda_tm  = sqrt(10)*eta_kl^(2/3)* integral^(1/3);
             %Taylor scale Reynolds number
-            Re_\lambda = \left({2 \over 3}k \right)\sqrt{{15 \over \nu \epsilon}}
+            %Re_\lambda = \left({2 \over 3}k \right)\sqrt{{15 \over \nu \epsilon}}
             
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
