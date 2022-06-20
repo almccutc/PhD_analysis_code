@@ -9,7 +9,7 @@ classdef PIVanalysis < handle
   
         g = 9.80665                     % (m/s2)                           
         mu = 2.5*1.81e-5                % (kg/m s) dynamic viscosity, u
-        nu                              % (m2/s) 
+        nu = 1.787*10-6;                % (m2/s) 
  
         u_original
         v_original
@@ -32,7 +32,13 @@ classdef PIVanalysis < handle
         u_rms
         v_rms
         tke
+        dis                 %dissipation
         target
+        tau_kt              %Kolmogorov time scale (sec) 
+        eta_kl              %Kolmogorov length scale (time)
+        lambda_tm           %Taylor microscale (centimeters) 
+        Re_lambda           %Taylor scale Reynolds number
+    
                           
         % nondimensional terms
         Re                  % Reynolds number w.r.t. Uinf
@@ -665,15 +671,15 @@ classdef PIVanalysis < handle
             
             %Kolmogorov length and time scales
             %time (sec)
-            tau_kt = (nu/epsilon)^0.5;
+            obj.tau_kt = (obj.nu/epsilon)^0.5;
             %length (cm)
-            eta_kl = (nu^3/epsilon)^0.25;
+            obj.eta_kl = (obj.nu^3/epsilon)^0.25;
             
             % Taylor microscale and Taylor Scale Reynolds number
             %Taylor microscale (centimeters) 
-            lambda_tm  = sqrt(10)*eta_kl^(2/3)* integral^(1/3);
+            obj.lambda_tm  = sqrt(10)*obj.eta_kl^(2/3)* integral^(1/3);
             %Taylor scale Reynolds number
-            Re_\lambda = \left({2 \over 3}k \right)\sqrt{{15 \over \nu \epsilon}}
+            obj.Re_lambda = (2/3)*obj.tke*sqrt(15/(obj.nu*obj.dis));
             
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
