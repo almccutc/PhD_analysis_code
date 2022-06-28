@@ -65,21 +65,6 @@ classdef PIVanalysis < handle
             obj.v_original = v_original(1:a,:,:);
             
         end
-        function reInitObj(obj)
-            % recomputes static variables. should be ran if any of the
-            % system properties are changed externally to ensure that 
-            % everything is consistent.
-            
-            %obj.u_o = obj.u_original;
-            %obj.v_o = obj.v_original;
-            
-%             obj.ztop = obj.H;
-%             obj.rbar = 1e-6:obj.drbar:obj.b;          
-%             obj.zbar = 0:obj.dzbar:1;
-%             
-%             obj.rMaxIndex = size(obj.rbar,2);
-%             obj.zMaxIndex = size(obj.zbar,2);
-        end 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
         function allfunctions(obj)
             reshapes(obj);
