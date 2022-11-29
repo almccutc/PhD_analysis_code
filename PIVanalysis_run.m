@@ -4,10 +4,7 @@
 clear, clc                                                                                                                  
 close all
 
-
-%make sure in the correct folder
 PIVanalysis_test = PIVanalysis(); 
-%PIVanalysis_test.Main();
 
 PIVanalysis_test.allfunctions;
 
