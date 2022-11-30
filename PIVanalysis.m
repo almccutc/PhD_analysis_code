@@ -98,8 +98,10 @@ classdef PIVanalysis < handle
             %load('H:\Aubrey Data\J20_Test\3_5V_1s_40percent_3_5ms_no_lid\PIVlab_results','u_original','v_original')
             %load('G:\J20 Tests\3_5V_40percent_1sec_4ms_cornerjets\PIVlab_results','u_original','v_original')
             %load('H:\Aubrey Data\J20_Test\3_5V_1s_40percent_4_5ms_no_lid_cornerjetsfixed\PIVlab_results','u_original','v_original')
-            load('H:\Aubrey Data\J20_Test\3_5V_1s_40percent_4_5ms_no_lid_cornerjetsfixed_nojetmesh\PIVlab_results','u_original','v_original','calxy')
+            %load('H:\Aubrey Data\J20_Test\3_5V_1s_40percent_4_5ms_no_lid_cornerjetsfixed_nojetmesh\PIVlab_results','u_original','v_original','calxy')
             %load('G:\J20 Tests\4_5V_1s_40percent_4_5ms_nomeshcornerjets\PIVlab_results','u_original','v_original','calxy')
+            %load('H:\Aubrey Data\J20_Test\4_5V_1s_40percent_5ms_nomeshcornerjets_somejetschanged\PIVlab_results','u_original','v_original','calxy')
+            load('H:\Aubrey Data\J20_Test\4_5V_1s_40percent_4_5ms_nomeshcornerjets_somejetschanged2_10mintues\PIVlab_results','u_original','v_original','calxy')
            
             obj.u_original = u_original;
             obj.v_original = v_original;
@@ -127,8 +129,11 @@ classdef PIVanalysis < handle
 %          obj.u_original = obj.u_original(:,32:217,:); 
 %          obj.v_original = obj.v_original(:,32:217,:);
 
-         obj.u_original = obj.u_original(:,:,1:600); 
-         obj.v_original = obj.v_original(:,:,1:600);
+%          obj.u_original = obj.u_original(17:169,49:200,:); 
+%          obj.v_original = obj.v_original(17:169,49:200,:);
+% 
+         obj.u_original = obj.u_original(:,:,1:2); 
+         obj.v_original = obj.v_original(:,:,1:2);
          
          %Matches NaN values for both u and w (i.e. if u has a NaN value at
          %(1,1,1) and v does not, these lines will assign a NaN value at
@@ -148,15 +153,15 @@ classdef PIVanalysis < handle
             ucheck = reshape(obj.u_original,1,Nx*Ny*Nt); vcheck = reshape(obj.v_original,1,Nx*Ny*Nt);
 
             figure(1)
-            title('Histograms of the $u$ and w velocities---Pre-Filter')
+            title('Histograms of the $u$ and w velocities - Pre-Filter')
             subplot(2,1,1)
             histogram(ucheck,100)
-            title('Histogram of the $u$ velocities---Pre-Filter','Interpreter','Latex')
+            title('Histogram of the $u$ velocities - Pre-Filter','Interpreter','Latex')
             ylabel('Frequency')
             xlabel('m/s')
             subplot(2,1,2)
             histogram(vcheck,100)
-            title('Histogram of the $w$ velocities---Pre-Filter','Interpreter','Latex')
+            title('Histogram of the $w$ velocities - Pre-Filter','Interpreter','Latex')
             ylabel('Frequency')
             xlabel('m/s')
             
@@ -241,25 +246,33 @@ classdef PIVanalysis < handle
             %title('Histograms of the $u$ and $w$ velocities---Pre and Post-Filter')
             subplot(2,2,1)
             
-            hist(ucheck,100)
-            title('Histogram of the $u$ velocities---Pre-Filter','Interpreter','Latex')
+            histogram(ucheck,100)
+            title('Histogram of the $u$ velocities','Interpreter','Latex')
             ylabel('Frequency')
             xlabel('$u$ (m/s)','Interpreter','Latex')
-            subplot(2,2,2)
-            hist(uaftercheck,100)
-            title('Histogram of the $u$ velocities---Post-Filter','Interpreter','Latex')
+            annotation('textbox',[0 .8 .1 .2], ...
+    'String','Pre-Filter    ','EdgeColor','none','Interpreter','Latex','fontsize', 18)
+            annotation('textbox',[0 .3 .1 .2], ...
+    'String','Post-Filter    ','EdgeColor','none','Interpreter','Latex','fontsize', 18)
+            subplot(2,2,3)
+            histogram(uaftercheck,100)
+            title('Histogram of the $u$ velocities','Interpreter','Latex')
             ylabel('Frequency') 
             xlabel('$u$ (m/s)','Interpreter','Latex')
-            subplot(2,2,3)
-            hist(vcheck,100)
-            title('Histogram of the $w$ velocities---Pre-Filter','Interpreter','Latex')
+            subplot(2,2,2)
+            histogram(vcheck,100)
+            title('Histogram of the $w$ velocities','Interpreter','Latex')
             ylabel('Frequency')
             xlabel('$w$ (m/s)','Interpreter','Latex')
             subplot(2,2,4)
-            hist(vaftercheck,100)
-            title('Histogram of the $w$ velocities---Post-Filter','Interpreter','Latex')
+            h = histogram(vaftercheck,100);
+            %set(h,'XData', obj.datamin:0.1:obj.datamax, 'YData',0:5000:max(h.Values))
+%             xlim([obj.datamin-0.2 obj.datamax])
+%             xticks(obj.datamin:0.1:obj.datamax)
+            title('Histogram of the $w$ velocities','Interpreter','Latex')
             ylabel('Frequency')
             xlabel('$w$ (m/s)','Interpreter','Latex')
+            set(gcf,'Position',[700 300 800 700])
 %             ax = gca;
 %             ax.YAxis.Exponent = 3;
             hold off
@@ -447,6 +460,8 @@ classdef PIVanalysis < handle
                 vtclean = vt.*(1-flag);
                 vtclean(vtclean==0) = NaN;
                 
+%                 uclean_save = nan(Nt,Ny,Nx); %preallocate 
+%                 vclean_save = nan(Nt,Ny,Nx);
                 uclean_save(tt,:,:) = utclean;
                 vclean_save(tt,:,:) = vtclean;
                 
@@ -523,10 +538,10 @@ classdef PIVanalysis < handle
                 break;
             end 
             if m==5
-                selecttt = str2num(cell2mat(inputdlg('Enter new time step:',...
+                selecttt = str2double(cell2mat(inputdlg('Enter new time step:',...
              'Skip to this time step', [1 50])));
             else
-                obj.target = str2num(cell2mat(inputdlg('Enter new target:',...
+                obj.target = str2double(cell2mat(inputdlg('Enter new target:',...
             'Target', [1 50])));
             end 
 
@@ -633,7 +648,7 @@ classdef PIVanalysis < handle
             beep
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        function velocityCalculations(obj) % and tke and isotropy
+        function velocityCalculations(obj) % and tke, isotropy, and mean flow strength
             
             % Bring in data, the is for a 3D double array, mine is 53 (height) by 79 (length) by 10,500 (in time)
             u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
@@ -650,86 +665,109 @@ classdef PIVanalysis < handle
             obj.u_rms_savg = nanmean(nanmean(obj.u_rms)); obj.v_rms_savg = nanmean(nanmean(obj.v_rms));
             tke = 0.5*(2*(obj. u_f.^2) + (obj. v_f.^2));
             obj.tke = nanmean(tke,3);
-            obj.tke_avg = nanmean(nanmean(obj.tke)); 
+            obj.tke_avg = nanmean(obj.tke,'all'); 
             obj.isotropy = obj.u_rms./obj.v_rms; 
-            obj.isotropy_avg = nanmean(nanmean(obj.isotropy)); 
+            obj.isotropy_avg = nanmean(obj.isotropy,'all'); 
 
-
-            obj.yaxis = [0:20:Ny]*obj.calibration*100*16; %converts subwindow count to cm
-            obj.xaxis = [0:20:Nx]*obj.calibration*100*16; %converts subwindow count to cm
+            obj.yaxis = [-Ny/2:20:Ny/2]*obj.calibration*100*16; %converts subwindow count to cm
+            obj.xaxis = [-Nx/2:20:Nx/2]*obj.calibration*100*16; %converts subwindow count to cm
             
             %Time average for each subwindow                            
             figure (1) 
             subplot(2,2,1)
-            imagesc(flipud(obj.u_mean*.100), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc(flipud(obj.u_mean*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
             %caxis([-0.02,0.02])
             title('Colorbar U-Velocity (cm/s)','Interpreter','Latex')
+            ylabel('cm')
+            xlabel('cm')
+
             subplot(2,2,2)
-            imagesc(flipud(obj.v_mean*.100), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc(flipud(obj.v_mean*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
             %caxis([-0.02,0.02])
             title('Colorbar W-Velocity (cm/s)','Interpreter','Latex')
+            ylabel('cm')
+            xlabel('cm')
 
             %RMS velocity for each subwindow
             subplot(2,2,3)
-            imagesc(flipud(obj.u_rms*.100), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc(flipud(obj.u_rms*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
             %caxis([-0.02,0.02])
-            title(['u_{rms} (cm/s), Spatial Avg: ',(num2str(obj.u_rms_savg))])
+            title(['u_{rms} (cm/s), Spatial Avg: ',(num2str(obj.u_rms_savg,3))])
+            ylabel('cm')
+            xlabel('cm')
+
             subplot(2,2,4)
-            imagesc(flipud(obj.v_rms*.100), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc(flipud(obj.v_rms*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
             %caxis([-0.02,0.02])
-            title(['w_{rms} (cm/s), Spatial Avg: ',(num2str(obj.v_rms_savg))])
+            title(['w_{rms} (cm/s), Spatial Avg: ',(num2str(obj.v_rms_savg,3))])
+            ylabel('cm')
+            xlabel('cm')
+            set(gcf,'Position',[700 300 1000 700])
 
             figure (2)
-            imagesc(flipud(obj.tke*.10000), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc(flipud(obj.tke*10000), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
             %caxis([-0.02,0.02])
-            title(['k (cm^2/s^2), Spatial Avg: ',(num2str(obj.tke_avg))])
+            title(['k (cm^2/s^2), Spatial Avg: ',(num2str(obj.tke_avg,3))])
+            ylabel('cm')
+            xlabel('cm')
             
             figure (3)
             imagesc(flipud(obj.isotropy), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
             %caxis([-0.02,0.02])
-            title(['Isotropy (u_{rms}/w_{rms}), Spatial Avg: ',(num2str(obj.isotropy_avg))])
+            title(['Isotropy (u_{rms}/w_{rms}), Spatial Avg: ',(num2str(obj.isotropy_avg,3))])
+            ylabel('cm')
+            xlabel('cm')
             
-            pause
-            close all
-
-            obj.m1 = obj.u_mean./obj.u_rms; %should this have a spatial average?
+            %mean flow strength 
+            obj.m1 = obj.u_mean./obj.u_rms; 
             obj.m3 = obj.v_mean./obj.v_rms;
-            obj.m1_avg = nanmean(nanmean(obj.m1));
-            obj.m3_avg = nanmean(nanmean(obj.m3));
+            obj.m1_avg = nanmean(obj.m1,'all');
+            obj.m3_avg = nanmean(obj.m3, 'all');
             
             obj.mstar = (0.5*(2*(obj.u_mean.^2) + (obj.v_mean.^2)))./(obj.tke); %time average U, W, and tke
-            obj.mstar_avg = nanmean(nanmean(obj.mstar));
+            obj.mstar_avg = nanmean(obj.mstar,'all');
             
             figure (4) 
-            subplot(2,1,1)
-            imagesc(obj.m1)
+            subplot(1,3,1)
+            imagesc(flipud(obj.m1), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
+            set(gca,'YDir','normal')
             %caxis([-0.02,0.02])
-            title(['M_1, Spatial Avg: ',num2str(obj.m1_avg)])
-            subplot(2,1,2)
-            imagesc(obj.m3)
+            title(['M_1, Spatial Avg: ',num2str(obj.m1_avg*100,3),' %'])
+            ylabel('cm')
+            xlabel('cm')
+
+            subplot(1,3,2)
+            imagesc(flipud(obj.m3), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
+            set(gca,'YDir','normal')
             %caxis([-0.02,0.02])
-            title(['M_3, Spatial Avg: ',num2str(obj.m3_avg)])
+            title(['M_3, Spatial Avg: ',num2str(obj.m3_avg*100,3),' %'])
+            ylabel('cm')
+            xlabel('cm')
             
-            
-            figure (5)
-            imagesc(obj.mstar)
+            subplot(1,3,3)
+            imagesc(flipud(obj.mstar), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
+            set(gca,'YDir','normal')
             %caxis([-0.02,0.02])
-            title(['M^*, Spatial Avg: ',num2str(obj.mstar_avg)])
+            title(['M^*, Spatial Avg: ',num2str(obj.mstar_avg*100,3),' %'])
+            ylabel('cm')
+            xlabel('cm')
+
+            set(gcf,'Position',[700 300 1240 300])
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function kolmogorovscales(obj) %dissipation needs to fixed
@@ -914,3 +952,6 @@ classdef PIVanalysis < handle
             title('Normalized dissipation spectrum and cumulative dissipation')
             legend('Normalized dissipation spectrum','Cumulative dissipation')
             
+        end
+    end
+end
