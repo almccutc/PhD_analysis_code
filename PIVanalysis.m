@@ -9,7 +9,7 @@ classdef PIVanalysis < handle
   
         g = 9.80665                     % (m/s2)                           
         mu = 2.5*1.81e-5                % (kg/m s) dynamic viscosity, u
-        nu = 1.787*10-6;                % (m2/s) 
+        nu = 0.8927*10-6;               % (m2/s) % https://www.omnicalculator.com/physics/water-viscosity
  
         u_original
         v_original
@@ -19,6 +19,12 @@ classdef PIVanalysis < handle
         agwpercentleft
         medianfilter_percentleft
         interpolated_percentleft
+        m1             % mean flow strength in x direction
+        m1_avg         % spatial average
+        m3             % mean flow strength in z direction
+        m3_avg         % spatial average
+        mstar          % relative mean flow strength
+        mstar_avg      % spatial average of relative mean flow strength
         u_agw
         v_agw
         u_nanfilter
@@ -26,18 +32,28 @@ classdef PIVanalysis < handle
         u_interpolated
         v_interpolated
         u_mean
+        u_mean_savg
         v_mean
+        v_mean_savg
+        ugrad               % u velocity gradient
         u_f
         v_f
         u_rms
         v_rms
-        tke
-        dis                 %dissipation
+        u_rms_savg
+        v_rms_savg
+        tke                 % turbulent kinetic energy
+        tke_avg
+        isotropy
+        isotropy_avg        % spatial average
+        integral_avg        % integral length scale spatial average
+        epsilon             % dissipation
+        epsilon_avg         % dissipation spatial average
         target
-        tau_kt              %Kolmogorov time scale (sec) 
-        eta_kl              %Kolmogorov length scale (time)
-        lambda_tm           %Taylor microscale (centimeters) 
-        Re_lambda           %Taylor scale Reynolds number
+        tau_kt              % Kolmogorov time scale (sec) 
+        eta_kl              % Kolmogorov length scale (time)
+        lambda_tm           % Taylor microscale (centimeters) 
+        Re_lambda           % Taylor scale Reynolds number
     
                           
         % nondimensional terms
@@ -55,22 +71,32 @@ classdef PIVanalysis < handle
         function obj = PIVanalysis()
             % include any initializations for properties here. It will be
             % ran whenever a new class instantiation is performed.
-            %load('C:\Users\alm6576\Desktop\PIVlab data\PIVlab_042021_1sec_4_5V','u_original','v_original') %Change% 
-            load('G:\J 20 All jets 2021\4 volts 1 sec 40\PIVlab','u_original','v_original')
-            %load('C:\Users\alm6576\Desktop\PIVlab data\PIVlab_042021_06sec_4V','u_original','v_original')
-            %load('C:\Users\alm6576\Downloads\Filter','A')
-            %load('032420_AM_0.6_40_105_630_10min_4.5V_Correct.mat','u_original','v_original') %Change% 
-            %load('032420_AM_01_80_120_720_10min_4.5V_Correct.mat','u_original','v_original')
-            %load('4Vworkspace.mat','Utotal','Wtotal'); 
-            %load('6Vworkspace.mat','Utotal','Wtotal');
-%             a=1258;
-%              obj.u_original = u_original(1:2:a,:,:); %for the piv lab error
-%              obj.v_original = v_original(1:2:a,:,:);
+            
+            
+              load('/Users/almccutc/Desktop/PIVlab_results','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 50 3_5 ms (new)/PIVlab_session','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 60 3_5 ms (new)/PIVlab_session','u_original','v_original') %not done yet
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 40 3_5 ms (redo)/PIVlab_session','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 40 3_5 ms (redo)/PIVlab_session','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 40 3_5 ms (redo)/PIVlab_session','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 40 3_5 ms (redo)/PIVlab_session','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 40 3_5 ms (redo)/PIVlab_session','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 40 3_5 ms (redo)/PIVlab_session','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 40 3_5 ms (redo)/PIVlab_session','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 40 3_5 ms (redo)/PIVlab_session','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 40 3_5 ms (redo)/PIVlab_session','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 40 3_5 ms (redo)/PIVlab_session','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 40 3_5 ms (redo)/PIVlab_session','u_original','v_original')
+%             load('G:\J 20 All jets 2021 EiFdata/final tests/3_5 volts 1 sec 40 3_5 ms (redo)/PIVlab_session','u_original','v_original')
+
+%        a=1258;
+%        obj.u_original = u_original(1:2:a,:,:); %for the piv lab error
+%        obj.v_original = v_original(1:2:a,:,:);
 
          obj.u_original = u_original;
          obj.v_original = v_original;
 % 
-%             obj.A = A;
+%        obj.A = A;
             
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
@@ -78,8 +104,9 @@ classdef PIVanalysis < handle
             reshapes(obj); % %this works well for PIVlab sessions
             checkHistogram(obj);
             applyAGWfilter(obj);
-            %onlymedfilter(obj);
-            %velocityCalculations(obj);
+            medfilter(obj);
+            velocityCalculations(obj);
+            meanflowstrengths(obj);
             %delaunyinterpolation(obj); 
             %spatialspectra(obj);
             %temporalspectra(obj);
@@ -482,16 +509,14 @@ classdef PIVanalysis < handle
             end 
             if m==5
                 selecttt = str2num(cell2mat(inputdlg('Enter new time step:',...
-             'Skip to this time step', [1 50])));
+             'Skip to this time step', [1 50]))); % [1 50] is dims for box height and width
             else
                 obj.target = str2num(cell2mat(inputdlg('Enter new target:',...
             'Target', [1 50])));
             end 
-
             
             %check if the target should be updated then, depending on how
-            %the plots looking 
-            
+            %the plot looks
             
             end
             obj.u_nanfilter = uclean_save;
@@ -508,6 +533,14 @@ classdef PIVanalysis < handle
             close all
             
             beep
+        end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        function bootstrap(obj)
+            bs_ufull=sort(bootstrp(1000,'mean',obj.u_nanfilter));
+            bs_ulower =  bs_ufull(25); bs_uupper =  bs_ufull(975);
+            
+            bs_wfull=sort(bootstrp(1000,'mean',obj.v_nanfilter));
+            bs_wlower =  bs_wfull(25); bs_wupper =  bs_wfull(975);
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
         function delaunyinterpolation(obj) 
@@ -583,21 +616,32 @@ classdef PIVanalysis < handle
             beep
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        function velocityCalculations(obj)
+        function velocityCalculations(obj) 
             
             % Bring in data, the is for a 3D double array, mine is 53 (height) by 79 (length) by 10,500 (in time)
             u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
             
             u_o=permute(u_o,[3 2 1]); v_o=permute(v_o,[3 2 1]); 
-
             
             [Ny,Nx,Nt] = size(u_o);
             
+            %mean velocities
             obj.u_mean = nanmean(u_o,3); obj.v_mean = nanmean(v_o,3);
+            obj.u_mean_savg = nanmean(obj.u_mean); obj.v_mean_savg = nanmean(obj.v_mean);
+            
+            %fluctuating velocities
             obj. u_f = u_o-obj.u_mean; obj.v_f = v_o-obj.v_mean;
             obj.u_rms = sqrt(nanmean((obj.u_f.^2),3)); obj.v_rms = sqrt(nanmean((obj.v_f.^2),3));
+            obj.u_rms_savg = nanmean(obj.u_rms); obj.v_rms_savg = nanmean(obj.v_rms);
+            
+            %turbulent kinetic energy
             tke = 0.5*(2*(obj. u_f.^2) + (obj. v_f.^2));
             obj.tke = nanmean(tke,3);
+            obj.tke_avg = nanmean(obj.tke); 
+            
+            %isotropy
+            obj.isotropy = obj.u_rms./obj.v_rms; 
+            obj.isotropy_avg = nanmean(obj.isotropy); 
             
             %Time average for each subwindow                            
             figure (1) 
@@ -612,26 +656,72 @@ classdef PIVanalysis < handle
             caxis([-0.02,0.02])
             title('Colorbar W-Velocity (m/s)','Interpreter','Latex')
 
-            %Time rms average for each subwindow
+            %RMS velocity for each subwindow
             subplot(2,2,3)
             imagesc(obj.u_rms)
             colorbar
             %caxis([-0.02,0.02])
-            title('Colorbar rms (m/s)')
+            title('u_{rms} (m/s)')
             subplot(2,2,4)
             imagesc(obj.v_rms)
             colorbar
             %caxis([-0.02,0.02])
-            title('Colorbar rms (m/s)')
+            title('w_{rms} (m/s)')
 
             figure (2)
             imagesc(obj.tke)
             colorbar
             %caxis([-0.02,0.02])
-            title('TKE (m^2/s^2)')
+            title('k (m^2/s^2), Avg: ')
+            
+            figure (3)
+            imagesc(obj.isotropy)
+            colorbar
+            %caxis([-0.02,0.02])
+            title('Isotropy (u_{rms}/w_{rms})')
             
             pause
             close all
+        end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        function meanflowstrengths(obj) 
+            
+            obj.m1 = obj.u_mean./obj.u_rms;
+            obj.m3 = obj.v_mean./obj.v_rms;
+            obj.m1_avg = nanmean(obj.m1);
+            obj.m3_avg = nanmean(obj.m3);
+            
+            obj.mstar = (0.5*(2*(obj.u_mean.^2) + (obj.v_mean.^2)))./(obj.tke); %time average U, W, and tke
+            obj.mstar_avg = nanmean(obj.mstar);
+            
+            figure (1) 
+            subplot(3,2,1)
+            imagesc(obj.m1)
+            colorbar
+            caxis([-0.02,0.02])
+            title('M_1, Avg: ')
+            subplot(2,2,2)
+            imagesc(obj.m3)
+            colorbar
+            caxis([-0.02,0.02])
+            title('M_3, Avg: ')
+            
+            
+            figure (2)
+            imagesc(obj.mstar)
+            colorbar
+            %caxis([-0.02,0.02])
+            title('M^*, Avg: ',obj.mstar_avg)
+        end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        function taylorscales(obj) %fix intregral length scale
+            %possibly fix tke too
+
+            % Taylor microscale (centimeters) 
+            obj.lambda_tm  = sqrt(10)*obj.eta_kl_corrected^(2/3)* obj.integral_avg^(1/3);
+            
+            % Taylor scale Reynolds number
+            obj.Re_lambda = (2/3)*obj.tke_avg*sqrt(15/(obj.nu*obj.epsilon_avg_corrected));
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
         function spatialspectra(obj)
@@ -663,9 +753,75 @@ classdef PIVanalysis < handle
                 Svv = fft(vspatial).*conj(fft(vspatial));
             end 
         end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
-        function temporalspectra(obj) %this mostly works but there are issues with the number of time steps
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+        function temporalspectraADV(obj) %this mostly works but there are issues with the number of time steps
             %right it is set to ensemble average of 10 runs
+            %this will be easier to deal with once I have the ADV data
+            
+            u_o = obj.u_interpolated; v_o = obj.v_interpolated;
+            
+            u_o=permute(u_o,[3 2 1]); v_o=permute(v_o,[3 2 1]); 
+            
+            %u_o(isnan(u_o)) = 0; v_o(isnan(v_o)) = 0;
+
+            %436(left to right), 288(top going dowwards)
+            %so approx subwindow (18,27)
+            xlocation = 18;
+            ylocation = 27;
+
+            u = u_o;
+            v = v_o;
+            [Nx,Ny,Nt] = size(u);
+            f_s = 105; %sample frequency
+            N = Nt/10; 
+            %N=1150;
+            T = N/f_s;
+            df = f_s/N;
+            f = df/2:df:f_s-df/2;
+            fny = f(1:(length(f)/2));
+
+            tempspectraU = [];
+            tempspectraW = [];
+
+            %this is done as an ensemble average
+            for i =1:10 
+               U = u(xlocation,ylocation,N*i-N+1:N*i);
+               W = v(xlocation,ylocation,N*i-N+1:N*i);
+               tempspectraU(:,:,i) = ((1/(f_s*T*f_s))*abs((fft(U)).^2)); 
+               tempspectraW(:,:,i) = ((1/(f_s*T*f_s))*abs((fft(W)).^2)); 
+            end
+
+            Suu=mean(tempspectraU,3);
+            Suu=permute(Suu, [2 1]); 
+            Suu = 2.*Suu(1:length(fny));
+
+            Sww=mean(tempspectraW,3);
+            Sww=permute(Sww, [2 1]); 
+            Sww = 2.*Sww(1:length(fny));
+
+            figure(1)
+            loglog(fny,Suu, 'g')
+            xlabel('f (Hz)','FontSize',12)
+            ylabel('S_{uu}, S_{ww} (m^{2}/s^{3})','FontSize',12)
+            xlim([-inf inf]);
+            ylim([10^-5 10^-2]);
+            grid on;
+            hold on
+            loglog(fny,Sww, 'r')
+            %title({'\fontsize{14} \it Autospectral Density Function';' '},'FontWeight','Normal','Interpreter','Latex')
+             b=-8;
+             c=exp(b);
+            hold on
+            y = c*fny.^(-5/3);
+            loglog(fny,y, 'k')
+
+            legend('S_{uu}','S_{ww}', '-5/3' )
+        end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+        function temporalspectraPIV(obj) %this mostly works but there are issues with the number of time steps
+            %right it is set to ensemble average of 10 runs
+            %this will be easier to deal with once I have the ADV data
+            
             u_o = obj.u_interpolated; v_o = obj.v_interpolated;
             
             u_o=permute(u_o,[3 2 1]); v_o=permute(v_o,[3 2 1]); 
@@ -786,6 +942,22 @@ classdef PIVanalysis < handle
         function dissipation(obj)  
             %dissipation is calculated using the direct method
             
+            dist = 0.32; %distance between velocity vectors in cm
+            
+            [Ny,Nx,Nt] = size(obj.u_original);
+            
+            z = zeros(Ny,1,Nt);
+            u2adj = [obj.u_nanfilter(:,1:Ny,:) z]
+            
+            u1adj = [z obj.u_nanfilter(:,1:Ny,:)]
+            
+            obj.ugrad = u2adj - u1adj;
+            obj.ugrad = nanmean((obj.ugrad(:,2:Ny-1,:)./dist)^2,3) %time average
+            
+            obj.epsilon = obj.nu*(4);                    % dissipation
+            
+            epsilon_avg = nanmean(obj.epsilon);          % dissipation spatial average
+            
             %integrated dissipation spectrum
             % eta is in mm, PIV resolution in mm
             R = deltax/eta;
@@ -800,178 +972,163 @@ classdef PIVanalysis < handle
             title('Normalized dissipation spectrum and cumulative dissipation')
             legend('Normalized dissipation spectrum','Cumulative dissipation')
             
-            %Kolmogorov length and time scales
-            %time (sec)
-            obj.tau_kt = (obj.nu/epsilon)^0.5;
-            %length (cm)
-            obj.eta_kl = (obj.nu^3/epsilon)^0.25;
-            
-            % Taylor microscale and Taylor Scale Reynolds number
-            %Taylor microscale (centimeters) 
-            obj.lambda_tm  = sqrt(10)*obj.eta_kl^(2/3)* integral^(1/3);
-            %Taylor scale Reynolds number
-            obj.Re_lambda = (2/3)*obj.tke*sqrt(15/(obj.nu*obj.dis));
-            
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%         function animateSpeed(obj, plot_filename, rr, snapK)
-%             % generates gif that displays velocity magnitude at every time
-%             % step
-%             if nargin < 4
-%                 snapK = 1e10;
-%             end
-%             if nargin < 3
-%                 rr = 0.5;
-%             end
-%             if nargin < 2
-%                 plot_filename = 'speedPlot.gif';
-%             end
-%             figure('Units', 'normalized', ...
-%             'Position', [0 0 0.4*obj.b 0.4], 'Visible', 'off');            
-%             [~, tfigs] = plotZR(obj,  obj.uMag(obj.uk(1), obj.vk(1)), true);
-%             ylabel(colorbar, '$\vert u/U_\infty\vert$', 'interpreter', 'latex', ...
-%                 'FontSize', 14); 
-%             caxis([0, sqrt(2)]);
-%             gif(plot_filename, 'frame', gcf);
-%             % update sequentially
-%             for ii = 1:length(obj.tau)                                      
-%                 gif;
-%                 t = obj.tau2t(obj.tau(ii));
-%                 u_ = obj.uMag(obj.uk(ii), obj.vk(ii));
-%                 tfigs.ZData = u_; 
-%                 title(sprintf('$t$ = %1.0f s', t), 'interpreter', 'latex', ...
-%                 'FontSize', 14);
-%                 pause(rr);
-%                 % save plot if on save time-step
-%                 if mod(ii, snapK) == 0
-%                     captureSpeed(obj, ii);
-%                 end
-%             end            
-%         end
-        
-%         function animateStress(obj, plot_filename, rr, snapK)
-%             generates gif that displays velocity magnitude at every time
-%             step
-%             if nargin < 4
-%                 snapK = 1e10;
-%             end
-%             if nargin < 3
-%                 rr = 0.5;
-%             end
-%             if nargin < 2
-%                 plot_filename = 'stressPlot.gif';
-%             end
-%             ur = obj.uk(1); uz = obj.vk(1);
-%             [~, ~, tauR, tauZ] = stress(obj, reshape(ur', [], 1), ...
-%                                                  reshape(uz', [], 1));
-%             s = sqrt(tauR.^2 + tauZ.^2);                                          
-%             figure('Units', 'normalized', ...
-%             'Position', [0 0 0.4*obj.b 0.4], 'Visible', 'off');            
-%             [~, tfigs] = plotZR(obj, s, true);
-%             ylabel(colorbar, '$\vert \tau \vert$ (Pa)', 'interpreter', 'latex', ...
-%                 'FontSize', 14); 
-%             caxis([min(s(:)), max(s(:))]);
-%             gif(plot_filename, 'frame', gcf);
-%             update sequentially
-%             for ii = 1:length(obj.tau)                                      
-%                 gif;
-%                 ur = obj.uk(ii); uz = obj.vk(ii);
-%                 [~, ~, tauR, tauZ] = stress(obj, reshape(ur', [], 1), ...
-%                                                  reshape(uz', [], 1));
-%                 s = sqrt(tauR.^2 + tauZ.^2); 
-%                 t = obj.tau2t(obj.tau(ii));
-%                 tfigs.ZData = s; 
-%                 title(sprintf('$t$ = %1.0f s', t), 'interpreter', 'latex', ...
-%                 'FontSize', 14);
-%                 pause(rr);
-%                 save plot if on save time-step
-%                 if mod(ii, snapK) == 0
-%                     captureStress(obj, ii);
-%                 end
-%             end            
-%         end
-        
-                  
-%         function captureSpeed(obj, k)
-%             % plots the non-dimensional speed profile over the entire
-%             % domain at the indicated time step, k
-%             % compute velocity magnitudes and time that will be ploted                                    
-%             u_ = obj.uMag(obj.uk(k), obj.vk(k));
-%             t = obj.tau2t(obj.tau(k));
-%             [R, Z] = meshgrid(obj.rbar, obj.zbar); 
-%             % plot contour
-%             fzri = figure('Units', 'normalized', ...
-%                 'Position', [0 0 0.4*obj.b 0.4], 'Visible', 'off');
-%             pzri = surf(R, Z, u_);         
-%             xlim([0, max(R(:))])
-%             ylim([min(Z(:)), max(Z(:))])
-%             pbaspect([obj.b, 1, 1]);  % figure sized proportional to aspect ratio
-%             view(0, 90);
-%             caxis([0, sqrt(2)]);
-%             colormap(flipud(spring));
-%             cb = colorbar;
-%             cb.Ruler.MinorTick = 'on';
-%             set(pzri, 'linestyle', 'none');
-%             ylabel(cb, '$\vert u/U_\infty\vert$', 'interpreter', 'latex', 'FontSize', 14);
-%             xlabel('$r/H$', 'interpreter', 'latex', 'FontSize', 14);
-%             ylabel('$z/H$', 'interpreter', 'latex', 'FontSize', 14);
-%             title(sprintf('$t$ = %1.0f s', t), 'interpreter', 'latex', ...
-%                 'FontSize', 14);
-%             if nargin > 2 && ShowPlot
-%                 fzri.Visible = 'on';
-%             end      
-%             % save figure
-%             saveas(pzri, sprintf('speed_%1.0d.png', k));
-%         end   
-%         function captureStress(obj, k)
-%             % plots the dimensional stress profile over the entire
-%             % domain at the indicated time step, k
-%             % compute stress magnitudes and time that will be ploted    
-%             ur = obj.uk(k); uz = obj.vk(k);
-%             [~, ~, tauR, tauZ] = stress(obj, reshape(ur', [], 1), ...
-%                                                  reshape(uz', [], 1));
-%             s = sqrt(tauR.^2 + tauZ.^2);                                
-%             t = obj.tau2t(obj.tau(k));
-%             [R, Z] = meshgrid(obj.rbar, obj.zbar); 
-%             % plot contour
-%             fzri = figure('Units', 'normalized', ...
-%                 'Position', [0 0 0.4*obj.b 0.4], 'Visible', 'off');
-%             pzri = surf(R, Z, s);         
-%             xlim([0, max(R(:))])
-%             ylim([min(Z(:)), max(Z(:))])
-%             pbaspect([obj.b, 1, 1]);  % figure sized proportional to aspect ratio
-%             view(0, 90);
-%             caxis([0, 1]);
-%             colormap(flipud(spring));
-%             cb = colorbar;
-%             cb.Ruler.MinorTick = 'on';
-%             set(pzri, 'linestyle', 'none');
-%             ylabel(cb, '$\vert \tau\vert$ (Pa)', 'interpreter', 'latex', 'FontSize', 14);
-%             xlabel('$r/H$', 'interpreter', 'latex', 'FontSize', 14);
-%             ylabel('$z/H$', 'interpreter', 'latex', 'FontSize', 14);
-%             title(sprintf('$t$ = %1.0f s', t), 'interpreter', 'latex', ...
-%                 'FontSize', 14);
-%             if nargin > 2 && ShowPlot
-%                 fzri.Visible = 'on';
-%             end      
-%             % save figure
-%             saveas(pzri, sprintf('stress_%1.0d.png', k));
-%         end
-%         function Main(obj)
-%             computeArStar(obj);
-%             computeAzStar(obj);
-%             computeApStar(obj);
-%             for iter_index = 1:size(obj.tau,2)
-%                 cur_tau = obj.tau(iter_index); cur_t = obj.tau2t(cur_tau);
-%                 computeUStar(obj);
-%                 computeu(obj);
-%                 patchVelocity(obj,iter_index);
-%             end
-%             captureSpeed(obj,size(obj.tau,2));
-%             captureSpeed(obj,size(obj.tau,2));
-%             animateSpeed(obj, 'plotSpeed.gif', 1, 1e10);
-%             animateStress(obj, 'plotSpeed.gif', 1, 1e10);
-%         end
+        function animateSpeed(obj, plot_filename, rr, snapK)
+            % generates gif that displays velocity magnitude at every time
+            % step
+            if nargin < 4
+                snapK = 1e10;
+            end
+            if nargin < 3
+                rr = 0.5;
+            end
+            if nargin < 2
+                plot_filename = 'speedPlot.gif';
+            end
+            figure('Units', 'normalized', ...
+            'Position', [0 0 0.4*obj.b 0.4], 'Visible', 'off');            
+            [~, tfigs] = plotZR(obj,  obj.uMag(obj.uk(1), obj.vk(1)), true);
+            ylabel(colorbar, '$\vert u/U_\infty\vert$', 'interpreter', 'latex', ...
+                'FontSize', 14); 
+            caxis([0, sqrt(2)]);
+            gif(plot_filename, 'frame', gcf);
+            % update sequentially
+            for ii = 1:length(obj.tau)                                      
+                gif;
+                t = obj.tau2t(obj.tau(ii));
+                u_ = obj.uMag(obj.uk(ii), obj.vk(ii));
+                tfigs.ZData = u_; 
+                title(sprintf('$t$ = %1.0f s', t), 'interpreter', 'latex', ...
+                'FontSize', 14);
+                pause(rr);
+                % save plot if on save time-step
+                if mod(ii, snapK) == 0
+                    captureSpeed(obj, ii);
+                end
+            end            
+        end
+        function animateStress(obj, plot_filename, rr, snapK)
+            generates gif that displays velocity magnitude at every time
+            step
+            if nargin < 4
+                snapK = 1e10;
+            end
+            if nargin < 3
+                rr = 0.5;
+            end
+            if nargin < 2
+                plot_filename = 'stressPlot.gif';
+            end
+            ur = obj.uk(1); uz = obj.vk(1);
+            [~, ~, tauR, tauZ] = stress(obj, reshape(ur', [], 1), ...
+                                                 reshape(uz', [], 1));
+            s = sqrt(tauR.^2 + tauZ.^2);                                          
+            figure('Units', 'normalized', ...
+            'Position', [0 0 0.4*obj.b 0.4], 'Visible', 'off');            
+            [~, tfigs] = plotZR(obj, s, true);
+            ylabel(colorbar, '$\vert \tau \vert$ (Pa)', 'interpreter', 'latex', ...
+                'FontSize', 14); 
+            caxis([min(s(:)), max(s(:))]);
+            gif(plot_filename, 'frame', gcf);
+            update sequentially
+            for ii = 1:length(obj.tau)                                      
+                gif;
+                ur = obj.uk(ii); uz = obj.vk(ii);
+                [~, ~, tauR, tauZ] = stress(obj, reshape(ur', [], 1), ...
+                                                 reshape(uz', [], 1));
+                s = sqrt(tauR.^2 + tauZ.^2); 
+                t = obj.tau2t(obj.tau(ii));
+                tfigs.ZData = s; 
+                title(sprintf('$t$ = %1.0f s', t), 'interpreter', 'latex', ...
+                'FontSize', 14);
+                pause(rr);
+                save plot if on save time-step
+                if mod(ii, snapK) == 0
+                    captureStress(obj, ii);
+                end
+            end            
+        end           
+        function captureSpeed(obj, k)
+            % plots the non-dimensional speed profile over the entire
+            % domain at the indicated time step, k
+            % compute velocity magnitudes and time that will be ploted                                    
+            u_ = obj.uMag(obj.uk(k), obj.vk(k));
+            t = obj.tau2t(obj.tau(k));
+            [R, Z] = meshgrid(obj.rbar, obj.zbar); 
+            % plot contour
+            fzri = figure('Units', 'normalized', ...
+                'Position', [0 0 0.4*obj.b 0.4], 'Visible', 'off');
+            pzri = surf(R, Z, u_);         
+            xlim([0, max(R(:))])
+            ylim([min(Z(:)), max(Z(:))])
+            pbaspect([obj.b, 1, 1]);  % figure sized proportional to aspect ratio
+            view(0, 90);
+            caxis([0, sqrt(2)]);
+            colormap(flipud(spring));
+            cb = colorbar;
+            cb.Ruler.MinorTick = 'on';
+            set(pzri, 'linestyle', 'none');
+            ylabel(cb, '$\vert u/U_\infty\vert$', 'interpreter', 'latex', 'FontSize', 14);
+            xlabel('$r/H$', 'interpreter', 'latex', 'FontSize', 14);
+            ylabel('$z/H$', 'interpreter', 'latex', 'FontSize', 14);
+            title(sprintf('$t$ = %1.0f s', t), 'interpreter', 'latex', ...
+                'FontSize', 14);
+            if nargin > 2 && ShowPlot
+                fzri.Visible = 'on';
+            end      
+            % save figure
+            saveas(pzri, sprintf('speed_%1.0d.png', k));
+        end   
+        function captureStress(obj, k)
+            % plots the dimensional stress profile over the entire
+            % domain at the indicated time step, k
+            % compute stress magnitudes and time that will be ploted    
+            ur = obj.uk(k); uz = obj.vk(k);
+            [~, ~, tauR, tauZ] = stress(obj, reshape(ur', [], 1), ...
+                                                 reshape(uz', [], 1));
+            s = sqrt(tauR.^2 + tauZ.^2);                                
+            t = obj.tau2t(obj.tau(k));
+            [R, Z] = meshgrid(obj.rbar, obj.zbar); 
+            % plot contour
+            fzri = figure('Units', 'normalized', ...
+                'Position', [0 0 0.4*obj.b 0.4], 'Visible', 'off');
+            pzri = surf(R, Z, s);         
+            xlim([0, max(R(:))])
+            ylim([min(Z(:)), max(Z(:))])
+            pbaspect([obj.b, 1, 1]);  % figure sized proportional to aspect ratio
+            view(0, 90);
+            caxis([0, 1]);
+            colormap(flipud(spring));
+            cb = colorbar;
+            cb.Ruler.MinorTick = 'on';
+            set(pzri, 'linestyle', 'none');
+            ylabel(cb, '$\vert \tau\vert$ (Pa)', 'interpreter', 'latex', 'FontSize', 14);
+            xlabel('$r/H$', 'interpreter', 'latex', 'FontSize', 14);
+            ylabel('$z/H$', 'interpreter', 'latex', 'FontSize', 14);
+            title(sprintf('$t$ = %1.0f s', t), 'interpreter', 'latex', ...
+                'FontSize', 14);
+            if nargin > 2 && ShowPlot
+                fzri.Visible = 'on';
+            end      
+            % save figure
+            saveas(pzri, sprintf('stress_%1.0d.png', k));
+        end
+        function Main(obj)
+            computeArStar(obj);
+            computeAzStar(obj);
+            computeApStar(obj);
+            for iter_index = 1:size(obj.tau,2)
+                cur_tau = obj.tau(iter_index); cur_t = obj.tau2t(cur_tau);
+                computeUStar(obj);
+                computeu(obj);
+                patchVelocity(obj,iter_index);
+            end
+            captureSpeed(obj,size(obj.tau,2));
+            captureSpeed(obj,size(obj.tau,2));
+            animateSpeed(obj, 'plotSpeed.gif', 1, 1e10);
+            animateStress(obj, 'plotSpeed.gif', 1, 1e10);
+        end
     end
              
 end
