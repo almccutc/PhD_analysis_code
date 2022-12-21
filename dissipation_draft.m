@@ -1,8 +1,4 @@
-            load('6Vworkspace.mat','Utotal','Wtotal')
-            obj.u_nanfilter = Utotal;  obj.v_nanfilter = Wtotal;
 
-%             obj.u_nanfilter = rand(5,10,3).*2;
-%             obj.v_nanfilter = rand(5,10,3).*2;
 
             deltax = 16*0.0000247; %m        %distance between velocity vectors
             obj.nu = 0.000000977; %m2/s
