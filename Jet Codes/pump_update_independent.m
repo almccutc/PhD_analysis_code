@@ -3,7 +3,7 @@
 % This code will generate random matrices that control the state of each
 % pump. Each row in the matrix represents a tenth of a second so the on
 % time for each pump will be represented by the number of rows that contain a
-% ’1’ in each column.
+% Â’1Â’ in each column.
 
 function out = pump_update_independent (A, mean_on_time, mean_off_time, sigma_on_time, sigma_off_time)
 if sigma_on_time > mean_on_time;
