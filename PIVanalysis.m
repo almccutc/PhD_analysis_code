@@ -48,6 +48,10 @@ classdef PIVanalysis < handle
         isotropy
         isotropy_avg        % spatial average
         integral_avg        % integral length scale spatial average
+        a_u_11_1
+        a_v_33_1
+        a_u_11_3
+        a_v_33_3
         epsilon             % dissipation
         epsilon_avg         % dissipation spatial average
         target
@@ -102,7 +106,7 @@ classdef PIVanalysis < handle
             %load('H:\Aubrey Data\J20_Test\3_5V_1s_40percent_4_5ms_no_lid_cornerjetsfixed_nojetmesh\PIVlab_results','u_original','v_original','calxy')
             %load('G:\J20 Tests\4_5V_1s_40percent_4_5ms_nomeshcornerjets\PIVlab_results','u_original','v_original','calxy')
             %load('H:\Aubrey Data\J20_Test\4_5V_1s_40percent_5ms_nomeshcornerjets_somejetschanged\PIVlab_results','u_original','v_original','calxy')
-            load('H:\Aubrey Data\J20_Test\4_5V_1s_40percent_4_5ms_nomeshcornerjets_somejetschanged2_10mintues\PIVlab_results','u_original','v_original','calxy')
+            load('/Volumes/Lab Drive/Aubrey Data/J20_Test/4_5V_1sec_20percent_nocornerjets/PIVlab_results','u_original','v_original','calxy')
            
             obj.u_original = u_original;
             obj.v_original = v_original;
@@ -127,14 +131,14 @@ classdef PIVanalysis < handle
          obj.u_original = cell2mat(permute(obj.u_original',[1,3,2])); %No filter is done within PIVLAB
          obj.v_original = cell2mat(permute(obj.v_original',[1,3,2])); %Has NaNs
          
-%          obj.u_original = obj.u_original(:,32:217,:); 
-%          obj.v_original = obj.v_original(:,32:217,:);
+         obj.u_original = obj.u_original(:,32:217,:); 
+         obj.v_original = obj.v_original(:,32:217,:);
 
 %          obj.u_original = obj.u_original(17:169,49:200,:); 
 %          obj.v_original = obj.v_original(17:169,49:200,:);
 % 
-         obj.u_original = obj.u_original(:,:,1:2); 
-         obj.v_original = obj.v_original(:,:,1:2);
+%          obj.u_original = obj.u_original(:,:,1:2); 
+%          obj.v_original = obj.v_original(:,:,1:2);
          
          %Matches NaN values for both u and w (i.e. if u has a NaN value at
          %(1,1,1) and v does not, these lines will assign a NaN value at
@@ -289,6 +293,9 @@ classdef PIVanalysis < handle
             
            %[Nt,Ny,Nx] = size(obj.u_original);
            [Ny,Nx,Nt] = size(obj.u_original);
+
+            uclean_save = zeros(Ny,Nx,Nt);
+            vclean_save = zeros(Ny,Nx,Nt);
            
             m=1;
             while(1)
@@ -322,8 +329,6 @@ classdef PIVanalysis < handle
                 vtclean = vt.*(1-flag);
                 vtclean(vtclean==0) = NaN;
                 
-%                 uclean_save(tt,:,:) = utclean;
-%                 vclean_save(tt,:,:) = vtclean;
                 uclean_save(:,:,tt) = utclean;
                 vclean_save(:,:,tt) = vtclean;
                 
@@ -354,7 +359,7 @@ classdef PIVanalysis < handle
                 xlim([0 Nx])
                 ylim([0 Ny])
                 title(['Time step: ', num2str(tt), ' out of ', num2str(Nt), '. Target: ', num2str(obj.target)])
-                lgd = legend('Original','AfterMedian','Location','northeastoutside');
+                legend('Original','AfterMedian','Location','northeastoutside');
                 
                 hold off
                 scale=3;
@@ -430,9 +435,11 @@ classdef PIVanalysis < handle
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function medfilter(obj)
-            obj.target = 0.15; %initial guess 
+            obj.target = 0.08; %initial guess 
             
             [Nt,Ny,Nx] = size(obj.u_agw);
+%             uclean_save = zeros(Nt,Ny,Nx); %preallocate 
+%             vclean_save = zeros(Nt,Ny,Nx);
             m=1;
             while(1)
             %selecttt = 0;
@@ -461,8 +468,7 @@ classdef PIVanalysis < handle
                 vtclean = vt.*(1-flag);
                 vtclean(vtclean==0) = NaN;
                 
-%                 uclean_save = nan(Nt,Ny,Nx); %preallocate 
-%                 vclean_save = nan(Nt,Ny,Nx);
+
                 uclean_save(tt,:,:) = utclean;
                 vclean_save(tt,:,:) = vtclean;
                 
@@ -490,7 +496,7 @@ classdef PIVanalysis < handle
                 xlim([0 Nx])
                 ylim([0 Ny])
                 title(['Time step: ', num2str(tt), ' out of ', num2str(Nt), '. Target: ', num2str(obj.target)])
-                lgd = legend('AGW','Median','Remaining','Location','northeastoutside');
+                legend('AGW','Median','Remaining','Location','northeastoutside');
                 
                 hold off
                 scale=3;
@@ -880,62 +886,156 @@ classdef PIVanalysis < handle
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%      
         function integrallength(obj)        
-            u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
+            u_o = obj.u_nanfilter.*100; v_o = obj.v_nanfilter.*100;
+            u_o=permute(u_o,[3 1 2]); v_o=permute(v_o,[3 1 2]);
             
-            u_o=permute(u_o,[1 3 2]); v_o=permute(v_o,[1 3 2]); 
-            %u_o=permute(u_o,[2 3 1]); v_o=permute(v_o,[2 1 3]);
+            subwindow=16;    %pixels between subwindow centers 
+            [Nt, Ny, Nx]=size(u_o); 
             
-            subwindow=32;    %pixels between subwindow centers 
-            res=0.0105;
-            lowb=1;
-            uppb=64; %not sure?
+            x_c=(Nx+1)/2; % determines the centerline position
+            y_c=(Ny+1)/2; % determines the centerline position
+            rad_x=[0,(subwindow:subwindow*2:Nx*subwindow).*obj.calibration]; %calibrate to cm
+            rad_y=[0,(subwindow:subwindow*2:Ny*subwindow).*obj.calibration]; %calibrate to cm
+            heights=([-Ny/2:1:-1 1:1:Ny/2]).*obj.calibration.*subwindow; %calibrate to cm
+            widths=([-Nx/2:1:-1 1:1:Nx/2]).*obj.calibration.*subwindow; %calibrate to cm
             
-            [time height width]=size(u_o);
-            height_subw=height:-1:1;
-            height_subw=height_subw.*res.*subwindow; %calibrate to cm
+            obj.a_u_11_1 = [ones([Ny 1]) NaN([Ny Nx/2])]; obj.a_v_33_1 = [ones([Ny 1]) NaN([Ny Nx/2])];
+            obj.a_u_11_3 = [ones([Nx 1]) NaN([Nx Ny/2])]; obj.a_v_33_3 = [ones([Nx 1]) NaN([Nx Ny/2])];
             
-            center=(width+1)/2;
-            radd=1:(center-2);
-            radd=radd.*subwindow.*res;
-            radd2(2:uppb)=radd.*2;
-            radd2(1)=0;
-
-            %autocorrelation calculation          
-            for row=1:height-7 %height-9 1:height-2, can't do height b/c otherwise it crashes...
-                for radius=1:center-2
-                    %calculate a(r) from VarianoCowen2008 formula 4.1
-                    au(row,radius)=nanmean(udata(:,row,center-radius).*udata(:,row,center+radius))...
-                        ./sqrt(nanmean(udata(:,row,center-radius).^2).*nanmean(udata(:,row,center+radius).^2));
-
-                    av(row,radius)=nanmean(vdata(:,row,center-radius).*vdata(:,row,center+radius))...
-                        ./sqrt(nanmean(vdata(:,row,center-radius).^2).*nanmean(vdata(:,row,center+radius).^2));
-
+             
+            %spatial, horizontal autocorrelation calculation, for the case of an even # of vertical and horizontal subwindows          
+            for row=1:Ny % calculated at every height for each subwindow 
+                for radius=0.5:1:x_c-0.5
+            
+                    %11,1 - longitudinal, Horizontal velocity, horizontal separation
+                    obj.a_u_11_1(row,radius+1.5)=mean(u_o(:,row,x_c-radius).*u_o(:,row,x_c+radius),'omitnan')...
+                        ./sqrt(mean(u_o(:,row,x_c-radius).^2,'omitnan').*mean(u_o(:,row,x_c+radius).^2,'omitnan'));
+                    
+                    %33,1 - transverse, Vertical velocity, horizontal separation
+                    obj.a_v_33_1(row,radius+1.5)=mean(v_o(:,row,x_c-radius).*v_o(:,row,x_c+radius),'omitnan')...
+                        ./sqrt(mean(v_o(:,row,x_c-radius).^2,'omitnan').*mean(v_o(:,row,x_c+radius).^2,'omitnan'));
                 end
             end
-                auplot(2:uppb)=au(row,:);
-                auplot(1)=1;
-                figure(120)
-                hold off;
-                plot(radd2,auplot,'b*');
-        %         title(row);
-                hold on;
+            
+            %spatial, vertical autocorrelation calculation, for the case of an even # of vertical and horizontal subwindows          
+            for column=1:Nx % calculated at every width for each subwindow 
+                for radius=0.5:1:y_c-0.5
+            
+                    %11,3 - longitudinal, Horizontal velocity, vertical separation
+                    obj.a_u_11_3(column, radius+1.5)=mean(u_o(:,y_c-radius,column).*u_o(:,y_c+radius,column),'omitnan')...
+                        ./sqrt(mean(u_o(:,y_c-radius,column).^2,'omitnan').*mean(u_o(:,y_c+radius,column).^2,'omitnan'));
+                    
+                    %33,3 - transverse, Vertical velocity, vertical separation
+                    obj.a_v_33_3(column,radius+1.5)=mean(v_o(:,y_c-radius,column).*v_o(:,y_c+radius,column),'omitnan')...
+                        ./sqrt(mean(v_o(:,y_c-radius,column).^2,'omitnan').*mean(v_o(:,y_c+radius,column).^2,'omitnan'));
+                end
+            end
+            
+            %calculate L at all heights
+            for row=1:Ny
+                
+                % Length scale calculation
+                newExpFuncG=@(rr,ll) exp(-rr./ll); 
+                %newExpFuncG_traverse=@(rr,ll) exp(-rr./ll).*(1-(rr./(2.*ll))); 
+            
+                L0=6; % Starting guess for L
+            
+                g_11_1=@(ll)sum((obj.a_u_11_1(row,:)-newExpFuncG(rad_x,ll)).^2,2);
+                g_33_1=@(ll)sum((obj.a_v_33_1(row,:)-newExpFuncG(rad_x,ll)).^2,2);
+            
+                % Minimize to find Lstar
+                L_11_1(row,1)=fminunc(g_11_1,L0); 
+                L_33_1(row,1)=fminunc(g_33_1,L0); 
+            
+                exp_11_1(row,:)=newExpFuncG(rad_x,L_11_1(row,1)); 
+                exp_33_1(row,:)=newExpFuncG(rad_x,L_33_1(row,1)); 
+            end    
+            
+            %calculate L at all widths
+            for column=1:Nx
+                
+                % Length scale calculation
+                newExpFuncG=@(rr,ll) exp(-rr./ll); 
+                %newExpFuncG_traverse=@(rr,ll) exp(-rr./ll).*(1-(rr./(2.*ll))); 
+            
+                L0=6; % Starting guess for L
+            
+                g_11_3=@(ll)sum((obj.a_u_11_3(column,:)-newExpFuncG(rad_y,ll)).^2,2);
+                g_33_3=@(ll)sum((obj.a_v_33_3(column,:)-newExpFuncG(rad_y,ll)).^2,2);
+            
+                % Minimize to find Lstar
+                L_11_3(column,1)=fminunc(g_11_3,L0); 
+                L_33_3(column,1)=fminunc(g_33_3,L0); 
+            
+                exp_11_3(column,:)=newExpFuncG(rad_y,L_11_3(column,1)); 
+                exp_33_3(column,:)=newExpFuncG(rad_y,L_33_3(column,1)); 
+            end   
+            
+                % autocorrelation plots
+                figure(1)
+                subplot(2,2,1)
+                plot(rad_x,obj.a_u_11_1(Ny/2,:),'b-*',rad_x,exp_11_1(Ny/2,:),'r-o');
+                grid on; 
+                legend('Actual','Predicted','Location','northeastoutside');
+                title('11,1 Autocorrelation - horizontal center','Interpreter','Latex', 'FontSize',14)
+                ylabel('a (r)'); xlabel('r (cm)')
+                xlim([0 max(rad_x)]); ylim([-1 1]);
+            
+                subplot(2,2,2)
+                plot(rad_x,obj.a_v_33_1(Ny/2,:),'b-*',rad_x,exp_33_1(Ny/2,:),'r-o');
                 grid on;
-        %         xlim([0 10])
-        %         ylim([0 1]);
+                legend('Actual','Predicted','Location','northeastoutside');
+                title('33,1 Autocorrelation - horizontal center','Interpreter','Latex', 'FontSize',14)
+                ylabel('a (r)'); xlabel('r (cm)')
+                xlim([0 max(rad_x)]); ylim([-1 1]);
             
-                newExpFuncG=@(rr,ll) exp(-rr./ll).*(1-(rr./(2.*ll)));          % Defines anon. func.
-                L0=6;                                         % Starting guess for L
-                g=@(ll)sum((avplot(lowb:uppb)-newExpFuncG(radd2(lowb:uppb),ll)).^2,2);            % Anon. function to be minimized
-                LstarG(kp,row)=fminunc(g,L0);                            % Minimize to find Lstar!
-                YhatG=newExpFuncG(radd2(lowb:uppb),LstarG(kp,row));                       % Predict values of Y
-                Resid=YhatG-avplot(lowb:uppb);                                   % Calc. residuals
-                SSR=sum(Resid.^2,2);                            % Sum of Squared Residuals
-                SSE=sum((avplot(lowb:uppb)-mean(avplot(lowb:uppb))).^2);                        % Sum of Squared Errors
-                RsquaredG(kp,row)=1-(SSR/SSE);
-
+                subplot(2,2,3)
+                plot(rad_y,obj.a_u_11_3(Nx/2,:),'b-*',rad_y,exp_11_3(Nx/2,:),'r-o');
+                grid on;
+                legend('Actual','Predicted','Location','northeastoutside');
+                title('11,3 Autocorrelation - vertical center','Interpreter','Latex', 'FontSize',14)
+                ylabel('a (r)'); xlabel('r (cm)')
+                xlim([0 max(rad_y)]); ylim([-1 1]);
             
+                subplot(2,2,4)
+                plot(rad_y,obj.a_v_33_3(Nx/2,:),'b-*',rad_y,exp_33_3(Nx/2,:),'r-o');
+                grid on;
+                legend('Actual','Predicted','Location','northeastoutside');
+                title('33,3 Autocorrelation - vertical center','Interpreter','Latex', 'FontSize',14)
+                ylabel('a (r)'); xlabel('r (cm)')
+                xlim([0 max(rad_y)]); ylim([-1 1]);
+                
+                % integral length scale plots
+                figure(2)
+                subplot(2,2,1)
+                plot(L_11_1,heights);
+                grid on; 
+                title('$L_{11,1}$','Interpreter','Latex', 'FontSize',14)
+                ylabel('height (cm)'); xlabel('L (cm)')
+                ylim([min(heights) max(heights)]);
             
-        end
+                subplot(2,2,2)
+                plot(L_33_1,heights);
+                grid on;
+                title('$L_{33,1}$','Interpreter','Latex', 'FontSize',14)
+                ylabel('height (cm)'); xlabel('L (cm)')
+                ylim([min(heights) max(heights)]);
+            
+                subplot(2,2,3)
+                plot(widths, L_11_3);
+                grid on;
+                title('$L_{11,3}$','Interpreter','Latex', 'FontSize',14)
+                ylabel('L (cm)'); xlabel('width (cm)')
+                xlim([min(widths) max(widths)]);
+            
+                subplot(2,2,4)
+                plot(widths, L_33_3);
+                grid on;
+                title('$L_{33,3}$','Interpreter','Latex', 'FontSize',14)
+                ylabel('L (cm)'); xlabel('width (cm)')
+                xlim([min(widths) max(widths)]);
+                        
+                    end
         function dissipation(obj)  
             %dissipation is calculated using the direct method
             
