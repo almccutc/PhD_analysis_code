@@ -1,5 +1,5 @@
 classdef PIVanalysis < handle
-    properties
+    properties % test
         % list all variables that will be passed between methods in the
         % model here. think of them as global variables within FFD. if a
         % value is included in the definition then it is treated as the
@@ -10,7 +10,7 @@ classdef PIVanalysis < handle
         %g = 9.80665                     % (m/s2)                           
         mu = 2.5*1.81e-5                % (kg/m s) dynamic viscosity, u
         nu = 0.8927*10-6;               % (m2/s) % https://www.omnicalculator.com/physics/water-viscosity
-
+ 
         calibration
         u_original
         v_original
