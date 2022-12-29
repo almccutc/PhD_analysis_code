@@ -101,8 +101,9 @@ classdef PIVanalysis < handle
             %load('H:\Aubrey Data\J20_Test\3_5V_1s_40percent_4_5ms_no_lid_cornerjetsfixed_nojetmesh\PIVlab_results','u_original','v_original','calxy')
             %load('G:\J20 Tests\4_5V_1s_40percent_4_5ms_nomeshcornerjets\PIVlab_results','u_original','v_original','calxy')
             %load('H:\Aubrey Data\J20_Test\4_5V_1s_40percent_5ms_nomeshcornerjets_somejetschanged\PIVlab_results','u_original','v_original','calxy')
-            load('H:\Aubrey Data\J20_Test\4_5V_1s_40percent_4_5ms_nomeshcornerjets_somejetschanged2_10mintues\PIVlab_results','u_original','v_original','calxy')
-           
+            %load('H:\Aubrey Data\J20_Test\4_5V_1s_40percent_4_5ms_nomeshcornerjets_somejetschanged2_10mintues\PIVlab_results','u_original','v_original','calxy')
+            load('C:\Users\PIV\Desktop\4_5V_1sec_20percent_jet3adjusted\PIVlab_results','u_original','v_original','calxy')
+
             obj.u_original = u_original;
             obj.v_original = v_original;
             obj.calibration = calxy; % Ex: 4e-05 m/px 
@@ -126,14 +127,14 @@ classdef PIVanalysis < handle
          obj.u_original = cell2mat(permute(obj.u_original',[1,3,2])); %No filter is done within PIVLAB
          obj.v_original = cell2mat(permute(obj.v_original',[1,3,2])); %Has NaNs
          
-%          obj.u_original = obj.u_original(:,32:217,:); 
-%          obj.v_original = obj.v_original(:,32:217,:);
+         obj.u_original = obj.u_original(:,32:217,:); 
+         obj.v_original = obj.v_original(:,32:217,:);
 
 %          obj.u_original = obj.u_original(17:169,49:200,:); 
 %          obj.v_original = obj.v_original(17:169,49:200,:);
 % 
-         obj.u_original = obj.u_original(:,:,1:2); 
-         obj.v_original = obj.v_original(:,:,1:2);
+%          obj.u_original = obj.u_original(:,:,1:2); 
+%          obj.v_original = obj.v_original(:,:,1:2);
          
          %Matches NaN values for both u and w (i.e. if u has a NaN value at
          %(1,1,1) and v does not, these lines will assign a NaN value at
