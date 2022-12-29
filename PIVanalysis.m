@@ -1,5 +1,5 @@
 classdef PIVanalysis < handle
-    properties
+    properties % test
         % list all variables that will be passed between methods in the
         % model here. think of them as global variables within FFD. if a
         % value is included in the definition then it is treated as the
@@ -9,8 +9,8 @@ classdef PIVanalysis < handle
   
         %g = 9.80665                     % (m/s2)                           
         mu = 2.5*1.81e-5                % (kg/m s) dynamic viscosity, u
-        nu = 0.8927*10-6;               % (m2/s) 
-
+        nu = 0.8927*10-6;               % (m2/s) % https://www.omnicalculator.com/physics/water-viscosity
+ 
         calibration
         u_original
         v_original
@@ -36,6 +36,7 @@ classdef PIVanalysis < handle
         u_mean_savg
         v_mean
         v_mean_savg
+        ugrad               % u velocity gradient
         u_f
         v_f
         u_rms
@@ -47,6 +48,10 @@ classdef PIVanalysis < handle
         isotropy
         isotropy_avg        % spatial average
         integral_avg        % integral length scale spatial average
+        a_u_11_1
+        a_v_33_1
+        a_u_11_3
+        a_v_33_3
         epsilon             % dissipation
         epsilon_avg         % dissipation spatial average
         target
@@ -289,6 +294,9 @@ classdef PIVanalysis < handle
             
            %[Nt,Ny,Nx] = size(obj.u_original);
            [Ny,Nx,Nt] = size(obj.u_original);
+
+            uclean_save = zeros(Ny,Nx,Nt);
+            vclean_save = zeros(Ny,Nx,Nt);
            
             m=1;
             while(1)
@@ -322,8 +330,6 @@ classdef PIVanalysis < handle
                 vtclean = vt.*(1-flag);
                 vtclean(vtclean==0) = NaN;
                 
-%                 uclean_save(tt,:,:) = utclean;
-%                 vclean_save(tt,:,:) = vtclean;
                 uclean_save(:,:,tt) = utclean;
                 vclean_save(:,:,tt) = vtclean;
                 
@@ -354,7 +360,7 @@ classdef PIVanalysis < handle
                 xlim([0 Nx])
                 ylim([0 Ny])
                 title(['Time step: ', num2str(tt), ' out of ', num2str(Nt), '. Target: ', num2str(obj.target)])
-                lgd = legend('Original','AfterMedian','Location','northeastoutside');
+                legend('Original','AfterMedian','Location','northeastoutside');
                 
                 hold off
                 scale=3;
@@ -430,9 +436,11 @@ classdef PIVanalysis < handle
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function medfilter(obj)
-            obj.target = 0.15; %initial guess 
+            obj.target = 0.08; %initial guess 
             
             [Nt,Ny,Nx] = size(obj.u_agw);
+%             uclean_save = zeros(Nt,Ny,Nx); %preallocate 
+%             vclean_save = zeros(Nt,Ny,Nx);
             m=1;
             while(1)
             %selecttt = 0;
@@ -461,8 +469,7 @@ classdef PIVanalysis < handle
                 vtclean = vt.*(1-flag);
                 vtclean(vtclean==0) = NaN;
                 
-%                 uclean_save = nan(Nt,Ny,Nx); %preallocate 
-%                 vclean_save = nan(Nt,Ny,Nx);
+
                 uclean_save(tt,:,:) = utclean;
                 vclean_save(tt,:,:) = vtclean;
                 
@@ -490,7 +497,7 @@ classdef PIVanalysis < handle
                 xlim([0 Nx])
                 ylim([0 Ny])
                 title(['Time step: ', num2str(tt), ' out of ', num2str(Nt), '. Target: ', num2str(obj.target)])
-                lgd = legend('AGW','Median','Remaining','Location','northeastoutside');
+                legend('AGW','Median','Remaining','Location','northeastoutside');
                 
                 hold off
                 scale=3;
@@ -880,78 +887,301 @@ classdef PIVanalysis < handle
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%      
         function integrallength(obj)        
-            u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
+            u_o = obj.u_nanfilter.*100; v_o = obj.v_nanfilter.*100;
+            u_o=permute(u_o,[3 1 2]); v_o=permute(v_o,[3 1 2]);
             
-            u_o=permute(u_o,[1 3 2]); v_o=permute(v_o,[1 3 2]); 
-            %u_o=permute(u_o,[2 3 1]); v_o=permute(v_o,[2 1 3]);
+            subwindow=16;    %pixels between subwindow centers 
+            [Nt, Ny, Nx]=size(u_o); 
             
-            subwindow=32;    %pixels between subwindow centers 
-            res=0.0105;
-            lowb=1;
-            uppb=64; %not sure?
+            x_c=(Nx+1)/2; % determines the centerline position
+            y_c=(Ny+1)/2; % determines the centerline position
+            rad_x=[0,(subwindow:subwindow*2:Nx*subwindow).*obj.calibration]; %calibrate to cm
+            rad_y=[0,(subwindow:subwindow*2:Ny*subwindow).*obj.calibration]; %calibrate to cm
+            heights=([-Ny/2:1:-1 1:1:Ny/2]).*obj.calibration.*subwindow; %calibrate to cm
+            widths=([-Nx/2:1:-1 1:1:Nx/2]).*obj.calibration.*subwindow; %calibrate to cm
             
-            [time height width]=size(u_o);
-            height_subw=height:-1:1;
-            height_subw=height_subw.*res.*subwindow; %calibrate to cm
+            obj.a_u_11_1 = [ones([Ny 1]) NaN([Ny Nx/2])]; obj.a_v_33_1 = [ones([Ny 1]) NaN([Ny Nx/2])];
+            obj.a_u_11_3 = [ones([Nx 1]) NaN([Nx Ny/2])]; obj.a_v_33_3 = [ones([Nx 1]) NaN([Nx Ny/2])];
             
-            center=(width+1)/2;
-            radd=1:(center-2);
-            radd=radd.*subwindow.*res;
-            radd2(2:uppb)=radd.*2;
-            radd2(1)=0;
-
-            %autocorrelation calculation          
-            for row=1:height-7 %height-9 1:height-2, can't do height b/c otherwise it crashes...
-                for radius=1:center-2
-                    %calculate a(r) from VarianoCowen2008 formula 4.1
-                    au(row,radius)=nanmean(udata(:,row,center-radius).*udata(:,row,center+radius))...
-                        ./sqrt(nanmean(udata(:,row,center-radius).^2).*nanmean(udata(:,row,center+radius).^2));
-
-                    av(row,radius)=nanmean(vdata(:,row,center-radius).*vdata(:,row,center+radius))...
-                        ./sqrt(nanmean(vdata(:,row,center-radius).^2).*nanmean(vdata(:,row,center+radius).^2));
-
+             
+            %spatial, horizontal autocorrelation calculation, for the case of an even # of vertical and horizontal subwindows          
+            for row=1:Ny % calculated at every height for each subwindow 
+                for radius=0.5:1:x_c-0.5
+            
+                    %11,1 - longitudinal, Horizontal velocity, horizontal separation
+                    obj.a_u_11_1(row,radius+1.5)=mean(u_o(:,row,x_c-radius).*u_o(:,row,x_c+radius),'omitnan')...
+                        ./sqrt(mean(u_o(:,row,x_c-radius).^2,'omitnan').*mean(u_o(:,row,x_c+radius).^2,'omitnan'));
+                    
+                    %33,1 - transverse, Vertical velocity, horizontal separation
+                    obj.a_v_33_1(row,radius+1.5)=mean(v_o(:,row,x_c-radius).*v_o(:,row,x_c+radius),'omitnan')...
+                        ./sqrt(mean(v_o(:,row,x_c-radius).^2,'omitnan').*mean(v_o(:,row,x_c+radius).^2,'omitnan'));
                 end
             end
-                auplot(2:uppb)=au(row,:);
-                auplot(1)=1;
-                figure(120)
-                hold off;
-                plot(radd2,auplot,'b*');
-        %         title(row);
-                hold on;
+            
+            %spatial, vertical autocorrelation calculation, for the case of an even # of vertical and horizontal subwindows          
+            for column=1:Nx % calculated at every width for each subwindow 
+                for radius=0.5:1:y_c-0.5
+            
+                    %11,3 - longitudinal, Horizontal velocity, vertical separation
+                    obj.a_u_11_3(column, radius+1.5)=mean(u_o(:,y_c-radius,column).*u_o(:,y_c+radius,column),'omitnan')...
+                        ./sqrt(mean(u_o(:,y_c-radius,column).^2,'omitnan').*mean(u_o(:,y_c+radius,column).^2,'omitnan'));
+                    
+                    %33,3 - transverse, Vertical velocity, vertical separation
+                    obj.a_v_33_3(column,radius+1.5)=mean(v_o(:,y_c-radius,column).*v_o(:,y_c+radius,column),'omitnan')...
+                        ./sqrt(mean(v_o(:,y_c-radius,column).^2,'omitnan').*mean(v_o(:,y_c+radius,column).^2,'omitnan'));
+                end
+            end
+            
+            %calculate L at all heights
+            for row=1:Ny
+                
+                % Length scale calculation
+                newExpFuncG=@(rr,ll) exp(-rr./ll); 
+                %newExpFuncG_traverse=@(rr,ll) exp(-rr./ll).*(1-(rr./(2.*ll))); 
+            
+                L0=6; % Starting guess for L
+            
+                g_11_1=@(ll)sum((obj.a_u_11_1(row,:)-newExpFuncG(rad_x,ll)).^2,2);
+                g_33_1=@(ll)sum((obj.a_v_33_1(row,:)-newExpFuncG(rad_x,ll)).^2,2);
+            
+                % Minimize to find Lstar
+                L_11_1(row,1)=fminunc(g_11_1,L0); 
+                L_33_1(row,1)=fminunc(g_33_1,L0); 
+            
+                exp_11_1(row,:)=newExpFuncG(rad_x,L_11_1(row,1)); 
+                exp_33_1(row,:)=newExpFuncG(rad_x,L_33_1(row,1)); 
+            end    
+            
+            %calculate L at all widths
+            for column=1:Nx
+                
+                % Length scale calculation
+                newExpFuncG=@(rr,ll) exp(-rr./ll); 
+                %newExpFuncG_traverse=@(rr,ll) exp(-rr./ll).*(1-(rr./(2.*ll))); 
+            
+                L0=6; % Starting guess for L
+            
+                g_11_3=@(ll)sum((obj.a_u_11_3(column,:)-newExpFuncG(rad_y,ll)).^2,2);
+                g_33_3=@(ll)sum((obj.a_v_33_3(column,:)-newExpFuncG(rad_y,ll)).^2,2);
+            
+                % Minimize to find Lstar
+                L_11_3(column,1)=fminunc(g_11_3,L0); 
+                L_33_3(column,1)=fminunc(g_33_3,L0); 
+            
+                exp_11_3(column,:)=newExpFuncG(rad_y,L_11_3(column,1)); 
+                exp_33_3(column,:)=newExpFuncG(rad_y,L_33_3(column,1)); 
+            end   
+            
+                % autocorrelation plots
+                figure(1)
+                subplot(2,2,1)
+                plot(rad_x,obj.a_u_11_1(Ny/2,:),'b-*',rad_x,exp_11_1(Ny/2,:),'r-o');
+                grid on; 
+                legend('Actual','Predicted','Location','northeastoutside');
+                title('11,1 Autocorrelation - horizontal center','Interpreter','Latex', 'FontSize',14)
+                ylabel('a (r)'); xlabel('r (cm)')
+                xlim([0 max(rad_x)]); ylim([-1 1]);
+            
+                subplot(2,2,2)
+                plot(rad_x,obj.a_v_33_1(Ny/2,:),'b-*',rad_x,exp_33_1(Ny/2,:),'r-o');
                 grid on;
-        %         xlim([0 10])
-        %         ylim([0 1]);
+                legend('Actual','Predicted','Location','northeastoutside');
+                title('33,1 Autocorrelation - horizontal center','Interpreter','Latex', 'FontSize',14)
+                ylabel('a (r)'); xlabel('r (cm)')
+                xlim([0 max(rad_x)]); ylim([-1 1]);
             
-                newExpFuncG=@(rr,ll) exp(-rr./ll).*(1-(rr./(2.*ll)));          % Defines anon. func.
-                L0=6;                                         % Starting guess for L
-                g=@(ll)sum((avplot(lowb:uppb)-newExpFuncG(radd2(lowb:uppb),ll)).^2,2);            % Anon. function to be minimized
-                LstarG(kp,row)=fminunc(g,L0);                            % Minimize to find Lstar!
-                YhatG=newExpFuncG(radd2(lowb:uppb),LstarG(kp,row));                       % Predict values of Y
-                Resid=YhatG-avplot(lowb:uppb);                                   % Calc. residuals
-                SSR=sum(Resid.^2,2);                            % Sum of Squared Residuals
-                SSE=sum((avplot(lowb:uppb)-mean(avplot(lowb:uppb))).^2);                        % Sum of Squared Errors
-                RsquaredG(kp,row)=1-(SSR/SSE);
-
+                subplot(2,2,3)
+                plot(rad_y,obj.a_u_11_3(Nx/2,:),'b-*',rad_y,exp_11_3(Nx/2,:),'r-o');
+                grid on;
+                legend('Actual','Predicted','Location','northeastoutside');
+                title('11,3 Autocorrelation - vertical center','Interpreter','Latex', 'FontSize',14)
+                ylabel('a (r)'); xlabel('r (cm)')
+                xlim([0 max(rad_y)]); ylim([-1 1]);
             
+                subplot(2,2,4)
+                plot(rad_y,obj.a_v_33_3(Nx/2,:),'b-*',rad_y,exp_33_3(Nx/2,:),'r-o');
+                grid on;
+                legend('Actual','Predicted','Location','northeastoutside');
+                title('33,3 Autocorrelation - vertical center','Interpreter','Latex', 'FontSize',14)
+                ylabel('a (r)'); xlabel('r (cm)')
+                xlim([0 max(rad_y)]); ylim([-1 1]);
+                
+                % integral length scale plots
+                figure(2)
+                subplot(2,2,1)
+                plot(L_11_1,heights);
+                grid on; 
+                title('$L_{11,1}$','Interpreter','Latex', 'FontSize',14)
+                ylabel('height (cm)'); xlabel('L (cm)')
+                ylim([min(heights) max(heights)]);
             
-        end
+                subplot(2,2,2)
+                plot(L_33_1,heights);
+                grid on;
+                title('$L_{33,1}$','Interpreter','Latex', 'FontSize',14)
+                ylabel('height (cm)'); xlabel('L (cm)')
+                ylim([min(heights) max(heights)]);
+            
+                subplot(2,2,3)
+                plot(widths, L_11_3);
+                grid on;
+                title('$L_{11,3}$','Interpreter','Latex', 'FontSize',14)
+                ylabel('L (cm)'); xlabel('width (cm)')
+                xlim([min(widths) max(widths)]);
+            
+                subplot(2,2,4)
+                plot(widths, L_33_3);
+                grid on;
+                title('$L_{33,3}$','Interpreter','Latex', 'FontSize',14)
+                ylabel('L (cm)'); xlabel('width (cm)')
+                xlim([min(widths) max(widths)]);
+                        
+                    end
         function dissipation(obj)  
-            %dissipation is calculated using the direct method
+            
+            deltax = 16*0.0000247; %m        %distance between velocity vectors
+            obj.nu = 0.000000977; %m2/s
+            
+            [Ny,Nx,Nt] = size(obj.u_nanfilter); %Ny-# of rows, Nx-# of columns
+            
+            %zero matrices
+            z_u = zeros(Ny,1,Nt); 
+            z_v = zeros(1,Nx,Nt);
+            
+            %size adjusted matrices
+            u2adjx = [obj.u_nanfilter z_u];
+            v2adjy = [obj.v_nanfilter; z_v];
+            u2adjy = [obj.u_nanfilter; z_v];
+            v2adjx = [obj.v_nanfilter z_u];
+            u1adjx = [z_u obj.u_nanfilter];
+            v1adjy = [z_v; obj.v_nanfilter];
+            u1adjy = [z_v; obj.u_nanfilter];
+            v1adjx = [z_u obj.v_nanfilter];
+            
+            %velocity gradients
+            obj.ugradx = u2adjx - u1adjx;
+            obj.vgrady = v2adjy - v1adjy;
+            obj.ugrady = u2adjy - u1adjy;
+            obj.vgradx = v2adjx - v1adjx;
+            
+            %gradient terms, squared and time averad
+            obj.ugrad_termx = nanmean(((obj.ugradx(2:Ny,2:Nx,:)./deltax).^2),3); %time average
+            obj.vgrad_termy =nanmean(((obj.vgrady(2:Ny,2:Nx,:)./deltax).^2),3); %time average
+            obj.ugrad_termy = nanmean(((obj.ugrady(2:Ny,2:Nx,:)./deltax).^2),3); %time average
+            obj.vgrad_termx = nanmean(((obj.vgradx(2:Ny,2:Nx,:)./deltax).^2),3); %time average
+            obj.uxvy_term = nanmean((((obj.ugradx(2:Ny,2:Nx,:)./deltax).*(obj.vgrady(2:Ny,2:Nx,:)./deltax))),3); %time average
+            obj.uyvx_term = nanmean((((obj.ugrady(2:Ny,2:Nx,:)./deltax).*(obj.vgradx(2:Ny,2:Nx,:)./deltax))),3); %time average
+            obj.uy_plus_vx_term = nanmean((((obj.ugrady(2:Ny,2:Nx,:)./deltax)+(obj.vgradx(2:Ny,2:Nx,:)./deltax))),3); %time average
+            % dissipation rate time average, m2/s3
+            obj.epsilon = obj.nu.*(4.*obj.ugrad_termx+obj.ugrad_termy+obj.vgrad_termx+2.*obj.vgrad_termy+2.*obj.uxvy_term+2.*obj.uyvx_term);
+            % dissipation rate spatial average
+            obj.epsilon_avg = nanmean(obj.epsilon(:));          
+            
+            obj.tau_kt = (obj.nu/obj.epsilon_avg)^0.5; % time (s)
+            obj.eta_kl = (obj.nu^3/obj.epsilon_avg)^0.25; %length (m)
             
             %integrated dissipation spectrum
-            % eta is in mm, PIV resolution in mm
-            R = deltax/eta;
-            x_pos = 2*pi/R;
-            % using x position to go up and across
-            figure(2)
-            plot(f,Gain, '-.b') % dissipation spectra
-            hold on
-            plot(f,G2, '--r') % integrated dissipation spectrum
-            xlabel('k_\eta')
-            ylabel('D(k)/u^3_\eta, \epsilon(0,k)/\epsilon_m')
-            title('Normalized dissipation spectrum and cumulative dissipation')
-            legend('Normalized dissipation spectrum','Cumulative dissipation')
+            R = (deltax/obj.eta_kl); 
+            x_pos = 2*pi/R
+            
+%             %correction value
+%             cvalue = str2num(cell2mat(inputdlg('Value on chart for the correction in %?',...
+%              'Dissipation Correction', [1 50])));
+
+             f = figure('Units','Normalized',...
+                 'Position',[.1 .1 .05 .05],...
+                 'NumberTitle','off',...
+                 'Name','Dissipation Correction');
+            imshow('universalspectrum.png')
+            title('Interation of Universal Spectrum, Enter % value.');
+            e = uicontrol('Style','Edit',...
+                 'Units','Normalized',...
+                 'Position',[.2 .4 .1 .1],...
+                 'Tag','myedit');
+            p = uicontrol('Style','PushButton',...
+                 'Units','Normalized',...
+                 'Position',[.3 .4 .1 .1],...
+                 'String','Enter',...
+                 'CallBack','uiresume(gcbf)');
+            annotation('textbox',[.2 .5 .4 .1],'String',['2*\pi/R: ',num2str(x_pos,3)],'FitBoxToText','on','BackgroundColor','w');
+
+            uiwait(f)
+            cvalue = str2num(get(e,'String'));
+            close all           
+            
+            %corrected values
+            obj.epsilon_corrected = obj.epsilon*(2-cvalue/100);
+            obj.epsilon_avg_corrected = nanmean(obj.epsilon_corrected(:)); 
+            obj.tau_kt_corrected = (obj.nu/obj.epsilon_avg_corrected)^0.5; % time (s)
+            obj.eta_kl_corrected = (obj.nu^3/obj.epsilon_avg_corrected)^0.25; %length (cm)
+            
+            figure (1)
+            imagesc(obj.epsilon_corrected)
+            colorbar
+            %caxis([-0.02,0.02])
+            title(['Dissipation, Avg: ',num2str(obj.epsilon_avg_corrected,5), ' m^2/s^3'])
+%             % using x position to go up and across
+%             figure(2)
+%             plot(f,Gain, '-.b') % dissipation spectra
+%             hold on
+%             plot(f,G2, '--r') % integrated dissipation spectrum
+%             xlabel('k_\eta')
+%             ylabel('D(k)/u^3_\eta, \epsilon(0,k)/\epsilon_m')
+%             title('Normalized dissipation spectrum and cumulative dissipation')
+%             legend('Normalized dissipation spectrum','Cumulative dissipation')
+
+              pause
+              close all
+            
+%% HIT turbulence dissipation equation    
+
+            obj.epsilon_iso = obj.nu.*(4.*obj.ugrad_termx+2.*obj.vgrad_termy+2.*obj.uy_plus_vx_term);
+            % dissipation rate spatial average
+            obj.epsilon_iso_avg = nanmean(obj.epsilon_iso(:));
+
+            obj.tau_kt_iso = (obj.nu/obj.epsilon_avg)^0.5; % time (s)
+            obj.eta_kl_iso = (obj.nu^3/obj.epsilon_avg)^0.25; %length (m)
+            
+            %integrated dissipation spectrum
+            R = (deltax/obj.eta_kl); 
+            x_pos = 2*pi/R
+            
+%             %correction value
+%             cvalue = str2num(cell2mat(inputdlg('Value on chart for the correction in %?',...
+%              'Dissipation Correction', [1 50])));
+
+             f = figure('Units','Normalized',...
+                 'Position',[.1 .1 .05 .05],...
+                 'NumberTitle','off',...
+                 'Name','Dissipation Correction');
+            imshow('universalspectrum.png')
+            title('Interation of Universal Spectrum, Enter % value.');
+            e = uicontrol('Style','Edit',...
+                 'Units','Normalized',...
+                 'Position',[.2 .4 .1 .1],...
+                 'Tag','myedit');
+            p = uicontrol('Style','PushButton',...
+                 'Units','Normalized',...
+                 'Position',[.3 .4 .1 .1],...
+                 'String','Enter',...
+                 'CallBack','uiresume(gcbf)');
+            annotation('textbox',[.2 .5 .4 .1],'String',['2*\pi/R: ',num2str(x_pos,3)],'FitBoxToText','on','BackgroundColor','w');
+
+            uiwait(f)
+            cvalue = str2num(get(e,'String'));
+            close all           
+            
+            %corrected values
+            obj.epsilon_iso_corrected = obj.epsilon*(2-cvalue/100);
+            obj.epsilon_avg_iso_corrected = nanmean(obj.epsilon_iso_corrected(:)); 
+            obj.tau_kt_iso_corrected = (obj.nu/obj.epsilon_avg_iso_corrected)^0.5; % time (s)
+            obj.eta_kl_iso_corrected = (obj.nu^3/obj.epsilon_avg_iso_corrected)^0.25; %length (cm)
+            
+            figure (1)
+            imagesc(obj.epsilon_iso_corrected)
+            colorbar
+            %caxis([-0.02,0.02])
+            title(['Dissipation, Iso equation, Avg: ',num2str(obj.epsilon_avg_iso_corrected,5), ' m^2/s^3'])
             
         end
     end
