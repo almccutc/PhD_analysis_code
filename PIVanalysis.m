@@ -52,17 +52,49 @@ classdef PIVanalysis < handle
         a_v_33_1
         a_u_11_3
         a_v_33_3
-        epsilon             % dissipation
-        epsilon_avg         % dissipation spatial average
+
         target
-        tau_kt              % Kolmogorov time scale (sec) 
-        eta_kl              % Kolmogorov length scale (time)
         lambda_tm           % Taylor microscale (centimeters) 
         Re_lambda           % Taylor scale Reynolds number
 
         yaxis
         xaxis
-    
+
+    %velocity gradients
+        ugradx
+        vgrady
+        ugrady
+        vgradx
+        
+        %gradient terms, squared and time averad
+        ugrad_termx
+        vgrad_termy
+        ugrad_termy
+        vgrad_termx
+        uxvy_term
+        uyvx_term
+        uy_plus_vx_term
+
+        % dissipation values full equation
+        epsilon             % dissipation
+        epsilon_avg         % dissipation spatial average
+        tau_kt              % Kolmogorov time scale (sec) 
+        eta_kl              % Kolmogorov length scale (time)
+        epsilon_corrected
+        epsilon_avg_corrected
+        tau_kt_corrected
+        eta_kl_corrected
+        
+        % dissipation values full equation, assuming isotropic 
+        epsilon_iso
+        epsilon_iso_avg
+        tau_kt_iso
+        eta_kl_iso
+
+        epsilon_iso_corrected
+        epsilon_avg_iso_corrected 
+        tau_kt_iso_corrected 
+        eta_kl_iso_corrected 
                           
         % nondimensional terms
         Re                  % Reynolds number w.r.t. Uinf
@@ -107,7 +139,7 @@ classdef PIVanalysis < handle
             %load('G:\J20 Tests\4_5V_1s_40percent_4_5ms_nomeshcornerjets\PIVlab_results','u_original','v_original','calxy')
             %load('H:\Aubrey Data\J20_Test\4_5V_1s_40percent_5ms_nomeshcornerjets_somejetschanged\PIVlab_results','u_original','v_original','calxy')
             %load('H:\Aubrey Data\J20_Test\4_5V_1s_40percent_4_5ms_nomeshcornerjets_somejetschanged2_10mintues\PIVlab_results','u_original','v_original','calxy')
-            load('C:\Users\PIV\Desktop\4_5V_1sec_20percent_jet3adjusted\PIVlab_results','u_original','v_original','calxy')
+            load('G:\J20 Tests\5_5V_1sec_15percent_alljets\PIVlab_results','u_original','v_original','calxy')
 
             obj.u_original = u_original;
             obj.v_original = v_original;
@@ -122,6 +154,8 @@ classdef PIVanalysis < handle
             applyAGWfilter(obj);
             medfilter(obj);
             velocityCalculations(obj);
+            dissipation(obj);
+            integrallength(obj)
             %delaunyinterpolation(obj); 
             %spatialspectra(obj);
             %temporalspectra(obj);
@@ -557,11 +591,9 @@ classdef PIVanalysis < handle
             %check if the target should be updated then, depending on how
             %the plots looking 
             
-            
             end
-            obj.u_nanfilter = uclean_save;
-            obj.v_nanfilter = vclean_save;
-            
+            obj.u_nanfilter = permute(uclean_save,[2 3 1]);
+            obj.v_nanfilter = permute(vclean_save,[2 3 1]);
             %checks for percent remaining from the original data
             [Ny,Nx,Nt] = size(obj.u_original);
             total = Ny*Nx*Nt; 
@@ -661,7 +693,7 @@ classdef PIVanalysis < handle
             % Bring in data, the is for a 3D double array, mine is 53 (height) by 79 (length) by 10,500 (in time)
             u_o = obj.u_nanfilter; v_o = obj.v_nanfilter;
             
-            u_o=permute(u_o,[3 2 1]); v_o=permute(v_o,[3 2 1]); 
+            %u_o=permute(u_o,[3 2 1]); v_o=permute(v_o,[3 2 1]); 
 
             
             [Ny,Nx,Nt] = size(u_o);
@@ -891,7 +923,7 @@ classdef PIVanalysis < handle
             u_o=permute(u_o,[3 1 2]); v_o=permute(v_o,[3 1 2]);
             
             subwindow=16;    %pixels between subwindow centers 
-            [Nt, Ny, Nx]=size(u_o); 
+            [~, Ny, Nx]=size(u_o); 
             
             x_c=(Nx+1)/2; % determines the centerline position
             y_c=(Ny+1)/2; % determines the centerline position
@@ -1082,7 +1114,7 @@ classdef PIVanalysis < handle
             
             %integrated dissipation spectrum
             R = (deltax/obj.eta_kl); 
-            x_pos = 2*pi/R
+            x_pos = 2*pi/R;
             
 %             %correction value
 %             cvalue = str2num(cell2mat(inputdlg('Value on chart for the correction in %?',...
@@ -1106,7 +1138,7 @@ classdef PIVanalysis < handle
             annotation('textbox',[.2 .5 .4 .1],'String',['2*\pi/R: ',num2str(x_pos,3)],'FitBoxToText','on','BackgroundColor','w');
 
             uiwait(f)
-            cvalue = str2num(get(e,'String'));
+            cvalue = str2double(get(e,'String'));
             close all           
             
             %corrected values
@@ -1119,7 +1151,7 @@ classdef PIVanalysis < handle
             imagesc(obj.epsilon_corrected)
             colorbar
             %caxis([-0.02,0.02])
-            title(['Dissipation, Avg: ',num2str(obj.epsilon_avg_corrected,5), ' m^2/s^3'])
+            title(['Dissipation, Avg: ',num2str(obj.epsilon_avg_corrected*10000,5), ' cm^2/s^3'])
 %             % using x position to go up and across
 %             figure(2)
 %             plot(f,Gain, '-.b') % dissipation spectra
@@ -1133,7 +1165,7 @@ classdef PIVanalysis < handle
               pause
               close all
             
-%% HIT turbulence dissipation equation    
+% HIT turbulence dissipation equation    
 
             obj.epsilon_iso = obj.nu.*(4.*obj.ugrad_termx+2.*obj.vgrad_termy+2.*obj.uy_plus_vx_term);
             % dissipation rate spatial average
@@ -1144,7 +1176,7 @@ classdef PIVanalysis < handle
             
             %integrated dissipation spectrum
             R = (deltax/obj.eta_kl); 
-            x_pos = 2*pi/R
+            x_pos = 2*pi/R;
             
 %             %correction value
 %             cvalue = str2num(cell2mat(inputdlg('Value on chart for the correction in %?',...
@@ -1168,7 +1200,7 @@ classdef PIVanalysis < handle
             annotation('textbox',[.2 .5 .4 .1],'String',['2*\pi/R: ',num2str(x_pos,3)],'FitBoxToText','on','BackgroundColor','w');
 
             uiwait(f)
-            cvalue = str2num(get(e,'String'));
+            cvalue = str2double(get(e,'String'));
             close all           
             
             %corrected values
@@ -1181,7 +1213,7 @@ classdef PIVanalysis < handle
             imagesc(obj.epsilon_iso_corrected)
             colorbar
             %caxis([-0.02,0.02])
-            title(['Dissipation, Iso equation, Avg: ',num2str(obj.epsilon_avg_iso_corrected,5), ' m^2/s^3'])
+            title(['Dissipation, Iso equation, Avg: ',num2str(obj.epsilon_avg_iso_corrected*10000,5), ' cm^2/s^3'])
             
         end
     end
