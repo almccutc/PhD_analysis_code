@@ -27,10 +27,13 @@ classdef PIVanalysis < handle
         interpolated_percentleft
         m1             % mean flow strength in x direction
         m1_avg         % spatial average
+        m1_median
         m3             % mean flow strength in z direction
         m3_avg         % spatial average
+        m3_median
         mstar          % relative mean flow strength
         mstar_avg      % spatial average of relative mean flow strength
+        mstar_median
         u_agw
         w_agw
         u_nanfilter
@@ -39,20 +42,32 @@ classdef PIVanalysis < handle
         w_interpolated
         u_mean
         u_mean_savg
+        u_mean_median
         w_mean
         w_mean_savg
+        w_mean_median
         ugrad           % u velocity gradient
+
         u_f
         w_f
         u_rms
         w_rms
         u_rms_savg
         w_rms_savg
+        u_rms_median
+        w_rms_median
+
         tke             % turbulent kinetic energy
         tke_avg
+        tke_median
+
         isotropy
         isotropy_avg    % spatial average
+        isotropy_median % spatial median
+
+        %integral scale values
         integral_avg    % integral length scale spatial average
+        tau_integral_ls % integral time scale
         a_u_11_1
         a_w_33_1
         a_u_11_3
@@ -67,8 +82,12 @@ classdef PIVanalysis < handle
         L_33_3
         
         target
-        lambda_tm       % Taylor microscale (centimeters) 
-        Re_lambda       % Taylor scale Reynolds number
+        lambda_tm_continuity       % Taylor microscale (centimeters) 
+        lambda_tm_dvdy_dudx
+        lambda_tm_dvdy_dwdz
+        Re_lambda_continuity       % Taylor scale Reynolds number
+        Re_lambda_dvdy_dudx
+        Re_lambda_dvdy_dwdz
 
         % velocity gradients
         dudx
@@ -83,7 +102,7 @@ classdef PIVanalysis < handle
         uxwz_term
         uzwx_term
 
-        % dissipation values full equation
+        % dissipation values full equation, 3 different assumptions
         epsilon             % dissipation
         epsilon_avg         % dissipation spatial average
         tau_kt              % Kolmogorov time scale (sec) 
@@ -138,35 +157,35 @@ classdef PIVanalysis < handle
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
         function allfunctions(obj)
-            reshapes(obj); % %this works well for PIVlab sessions
-            checkHistogram(obj);
-            applyAGWfilter(obj);
-            medfilter(obj);
+            reshape(obj); % %this works well for PIVlab sessions
+            %checkHistogram(obj);
+            %applyAGWfilter(obj);
+            %medfilter(obj);
             velocityCalculations(obj);
-            velocityPlots(obj)
-            %integrallength(obj)
-            dissipation(obj);
+            %velocityPlots(obj)
+            integrallength(obj)
+            %dissipation(obj);
             %delaunyinterpolation(obj); 
             %spatialspectra(obj);
             %temporalspectra(obj);
             
         end    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-        function reshapes(obj)
+        function reshape(obj)
          obj.u_original = cell2mat(permute(obj.u_original',[1,3,2])).*100; 
          obj.w_original = cell2mat(permute(obj.w_original',[1,3,2])).*100;
 
          %uncomment for using agw and nan filters
-         obj.u_original = obj.u_original(:,2:249,:); 
-         obj.w_original = obj.w_original(:,2:249,:);
+         obj.u_original = obj.u_original(:,2:249,1:10); 
+         obj.w_original = obj.w_original(:,2:249,1:10);
 % 
          %uncomment for using agw and nan filters
          obj.u_original(isnan(obj.u_original)) = NaN;
          obj.w_original(isnan(obj.w_original)) = NaN;
 % 
-%          obj.u_nanfilter = obj.u_original(:,32:217,:); 
-%          obj.w_nanfilter = obj.w_original(:,32:217,:);
-         
+%          obj.u_nanfilter = obj.u_original(:,32:217,1:5); 
+%          obj.w_nanfilter = obj.w_original(:,32:217,1:5);
+%          
 %          Matches NaN values for both u and w (i.e. if u has a NaN value at
 %          (1,1,1) and v does not, these lines will assign a NaN value at
 %          (1,1,1) for v to match u. 
@@ -630,25 +649,45 @@ classdef PIVanalysis < handle
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function velocityCalculations(obj) % and tke, isotropy, and mean flow strength
-            
-            % Bring in data, the is for a 3D double array, mine is 53 (height) by 79 (length) by 10,500 (in time)
             u_o = obj.u_nanfilter; w_o = obj.w_nanfilter;
             
             [Ny,Nx,Nt] = size(u_o);
             
             obj.u_mean = mean(u_o,3,'omitnan'); obj.w_mean = mean(w_o,3,'omitnan');
             obj.u_mean_savg = mean(obj.u_mean,'all','omitnan'); obj.w_mean_savg = mean(obj.w_mean,'all','omitnan');
+            obj.u_mean_median = median(obj.u_mean,'all','omitnan'); obj.w_mean_median = median(obj.w_mean,'all','omitnan');
+
             obj.u_f = u_o-obj.u_mean; obj.w_f = w_o-obj.w_mean;
+
             obj.u_rms = sqrt(mean(obj.u_f.^2,3,'omitnan')); obj.w_rms = sqrt(mean(obj.w_f.^2,3,'omitnan'));
             obj.u_rms_savg = mean(obj.u_rms,'all','omitnan'); obj.w_rms_savg = mean(obj.w_rms,'all','omitnan');
+            obj.u_rms_median = median(obj.u_rms,'all','omitnan'); obj.w_rms_median = median(obj.w_rms,'all','omitnan');
+
             tke = 0.5*(2*(obj. u_rms.^2) + (obj. w_rms.^2));
             obj.tke = mean(tke,3,'omitnan');
             obj.tke_avg = mean(obj.tke,'all','omitnan'); 
+            obj.tke_median = median(obj.tke,'all','omitnan'); 
+
             obj.isotropy = obj.u_rms./obj.w_rms; 
             obj.isotropy_avg = mean(obj.isotropy,'all','omitnan'); 
+            obj.isotropy_median = median(obj.isotropy,'all','omitnan'); 
 
             obj.yaxis = (-Ny/2+3:1:Ny/2+3)*obj.calibration*obj.subwindow; %converts subwindow count to cm
             obj.xaxis = (-Nx/2:1:Nx/2)*obj.calibration*obj.subwindow; %converts subwindow count to cm
+
+            %mean flow strength 
+            obj.m1 = obj.u_mean./obj.u_rms; 
+            obj.m1_avg = mean(obj.m1,'all','omitnan');
+            obj.m1_median = median(obj.m1,'all','omitnan');
+
+            obj.m3 = obj.w_mean./obj.w_rms;
+            obj.m3_avg = mean(obj.m3,'all','omitnan');
+            obj.m3_median = median(obj.m3,'all','omitnan');
+            
+            obj.mstar = (0.5*(2*(obj.u_mean.^2) + (obj.w_mean.^2)))./(obj.tke); %time average U, W, and tke
+            obj.mstar_avg = mean(obj.mstar,'all','omitnan');
+            obj.mstar_median = median(obj.mstar,'all','omitnan');
+
         end
         function velocityPlots(obj)     
             %Time average for each subwindow                            
@@ -657,7 +696,7 @@ classdef PIVanalysis < handle
             imagesc(flipud(obj.u_mean), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal') 
-            title('U mean velocity (cm/s)','Interpreter','Latex')
+            title(['$\overline{U}:\:',(num2str(obj.u_mean_savg,3)),'\:cm/s\;M_d:\:',(num2str(obj.u_mean_median,3)),'\:cm/s$'],'Interpreter','latex')
             ylabel('cm')
             xlabel('cm')
 
@@ -665,7 +704,7 @@ classdef PIVanalysis < handle
             imagesc(flipud(obj.w_mean), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title('W mean velocity (cm/s)','Interpreter','Latex')
+            title(['$\overline{W}:\:',(num2str(obj.w_mean_savg,3)),'\:cm/s\;M_d:\:',(num2str(obj.w_mean_median,3)),'\:cm/s$'],'Interpreter','latex')
             ylabel('cm')
             xlabel('cm')
 
@@ -674,7 +713,7 @@ classdef PIVanalysis < handle
             imagesc(flipud(obj.u_rms), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title(['u_{rms}, Spatial avg: ',(num2str(obj.u_rms_savg,3)),' (cm/s)'])
+            title(['$\overline{u_{rms}}:\:',(num2str(obj.u_rms_savg,3)),'\:cm/s\;M_d:\:',(num2str(obj.u_rms_median,3)),'\:cm/s$'],'Interpreter','latex')
             ylabel('cm')
             xlabel('cm')
 
@@ -682,7 +721,7 @@ classdef PIVanalysis < handle
             imagesc(flipud(obj.w_rms), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title(['w_{rms}, Spatial avg: ',(num2str(obj.w_rms_savg,3)),' (cm/s)'])
+            title(['$\overline{w_{rms}}:\:',(num2str(obj.w_rms_savg,3)),'\:cm/s\;M_d:\:',(num2str(obj.w_rms_median,3)),'\:cm/s$'],'Interpreter','latex')
             ylabel('cm')
             xlabel('cm')
             set(gcf,'Position',[700 300 1000 700])
@@ -691,7 +730,7 @@ classdef PIVanalysis < handle
             imagesc(flipud(obj.tke), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title(['k, Spatial avg: ',(num2str(obj.tke_avg,3)),' (cm^2/s^2)'])
+            title(['$\overline{k}:\:',(num2str(obj.tke_avg,3)),'\:cm^2/s^2\;M_d:\:',(num2str(obj.tke_median,3)),'\:cm^2/s^2$'],'Interpreter','latex')
             ylabel('cm')
             xlabel('cm')
             
@@ -699,25 +738,16 @@ classdef PIVanalysis < handle
             imagesc(flipud(obj.isotropy), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title(['Isotropy (u_{rms}/w_{rms}), Spatial avg: ',(num2str(obj.isotropy_avg,3))])
+            title(['$Isotropy\:-\:\frac{u_{rms}}{w_{rms}}:\:',(num2str(obj.isotropy_avg,3)),'\;M_d:\:',(num2str(obj.isotropy_median,3)),'$'],'Interpreter','latex')
             ylabel('cm')
             xlabel('cm')
-            
-            %mean flow strength 
-            obj.m1 = obj.u_mean./obj.u_rms; 
-            obj.m3 = obj.w_mean./obj.w_rms;
-            obj.m1_avg = mean(obj.m1,'all','omitnan');
-            obj.m3_avg = mean(obj.m3,'all','omitnan');
-            
-            obj.mstar = (0.5*(2*(obj.u_mean.^2) + (obj.w_mean.^2)))./(obj.tke); %time average U, W, and tke
-            obj.mstar_avg = mean(obj.mstar,'all','omitnan');
             
             figure (4) 
             subplot(1,3,1)
             imagesc(flipud(obj.m1*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title(['M_1, Spatial Avg: ',num2str(obj.m1_avg*100,3),' %'])
+            title(['$\overline{M_1}:\:',(num2str(obj.m1_avg*100,3)),'\: \% \;M_d:\:',(num2str(obj.m1_median*100,3)),'\:\%$'],'Interpreter','latex')
             ylabel('cm')
             xlabel('cm')
 
@@ -725,7 +755,7 @@ classdef PIVanalysis < handle
             imagesc(flipud(obj.m3*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')         
-            title(['M_3, Spatial Avg: ',num2str(obj.m3_avg*100,3),' %'])
+            title(['$\overline{M_3}:\:',(num2str(obj.m3_avg*100,3)),'\:\%\;M_d:\:',(num2str(obj.m3_median*100,3)),'\:\% $'],'Interpreter','latex')
             ylabel('cm')
             xlabel('cm')
             
@@ -733,27 +763,25 @@ classdef PIVanalysis < handle
             imagesc(flipud(obj.mstar*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')       
-            title(['M^*, Spatial Avg: ',num2str(obj.mstar_avg*100,3),' %'])
+            title(['$\overline{M^*}:\:',(num2str(obj.mstar_avg*100,3)),'\:\%\;M_d:\:',(num2str(obj.mstar_median*100,3)),'\:\% $'],'Interpreter','latex')
             ylabel('cm')
             xlabel('cm')
             set(gcf,'Position',[700 300 1240 300])
 
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        function kolmogorovscales(obj) %dissipation needs to fixed
-            obj.tau_kt = (obj.nu/obj.epsilon_avg)^0.5; % time
-            
-            obj.eta_kl = (obj.nu^3/obj.epsilon_avg)^0.25; %length (cm)
-        end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        function taylorscales(obj) %fix dissipation and intregral length scale
-            %possibly fix tke too
+        function taylorscales(obj) % which average to use for the integral length scale
 
             % Taylor microscale (centimeters) 
-            obj.lambda_tm  = sqrt(10)*obj.eta_kl^(2/3)* obj.integral_avg^(1/3);
+            obj.lambda_tm_continuity = sqrt(10)*obj.eta_kl_corrected^(2/3)* obj.integral_avg^(1/3);
+            obj.lambda_tm_dvdy_dudx = sqrt(10)*obj.eta_kl_dvdy_dudx_corrected^(2/3)* obj.integral_avg^(1/3);
+            obj.lambda_tm_dvdy_dwdz = sqrt(10)*obj.eta_kl_dvdy_dwdz_corrected ^(2/3)* obj.integral_avg^(1/3);
             
             % Taylor scale Reynolds number
-            obj.Re_lambda = (2/3)*obj.tke_avg*sqrt(15/(obj.nu*obj.epsilon_avg));
+            obj.Re_lambda_continuity = (2/3)*obj.tke_avg*sqrt(15/(obj.nu*obj.epsilon_avg_corrected));
+            obj.Re_lambda_dvdy_dudx  = (2/3)*obj.tke_avg*sqrt(15/(obj.nu*obj.epsilon_avg_dvdy_dudx_corrected));
+            obj.Re_lambda_dvdy_dwdz = (2/3)*obj.tke_avg*sqrt(15/(obj.nu*obj.epsilon_avg_dvdy_dwdz_corrected));
+
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
         function spatialspectra(obj)
@@ -850,7 +878,7 @@ classdef PIVanalysis < handle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%      
         function integrallength(obj)    
 
-             u_o = permute(obj.u_f,[3 1 2]); w_o = permute(obj.w_f,[3 1 2]); %cm/s
+             u_o = permute(obj.u_f,[3 2 1]); w_o = permute(obj.w_f,[3 2 1]); %cm/s
             
             [~,Nx, Ny]=size(u_o); 
             
@@ -858,7 +886,7 @@ classdef PIVanalysis < handle
             y_c=(Ny+1)/2; % determines the centerline position
             rad_x =[0,(obj.subwindow:obj.subwindow*2:Nx*obj.subwindow).*obj.calibration]; %calibrate to cm
             rad_y =[0,(obj.subwindow:obj.subwindow*2:Ny*obj.subwindow).*obj.calibration]; %calibrate to cm
-            heights=([-Ny/2:1:-1 1:1:Ny/2]).*obj.calibration.*obj.subwindow; %calibrate to cm
+            obj.heights=([-Ny/2:1:-1 1:1:Ny/2]).*obj.calibration.*obj.subwindow; %calibrate to cm
             widths=([-Nx/2:1:-1 1:1:Nx/2]).*obj.calibration.*obj.subwindow; %calibrate to cm
             
             obj.a_u_11_1 = [ones([Ny 1]) NaN([Ny Nx/2])]; obj.a_w_33_1 = [ones([Ny 1]) NaN([Ny Nx/2])];
@@ -866,7 +894,7 @@ classdef PIVanalysis < handle
             
              
             %spatial, horizontal autocorrelation calculation, for the case of an even # of vertical and horizontal subwindows          
-            for row=1:Ny % calculated at every height for each subwindow 
+            for row=1:Nx % calculated at every height for each subwindow 
                 for radius=0.5:1:x_c-1
             
                     %11,1 - longitudinal, Horizontal velocity, horizontal separation
@@ -880,7 +908,7 @@ classdef PIVanalysis < handle
             end
             
             %spatial, vertical autocorrelation calculation, for the case of an even # of vertical and horizontal subwindows          
-            for column=1:Nx % calculated at every width for each subwindow 
+            for column=1:Ny % calculated at every width for each subwindow 
                 for radius=0.5:1:y_c-1
             
                     %11,3 - transverse, Horizontal velocity, vertical separation
@@ -964,16 +992,16 @@ classdef PIVanalysis < handle
             title(t,'Integral Length Scale, $L$ (cm)','Interpreter','Latex', 'FontSize',14)
             % Tile 1
             nexttile
-            plot(obj.L_11_1,heights);
+            plot(obj.L_11_1,obj.heights);
             title('$L_{11,1}$','Interpreter','Latex', 'FontSize',14)
             ylabel('y (cm)'); xlabel('L (cm)'); grid on;
-            ylim([min(heights) max(heights)]);
+            ylim([min(obj.heights) max(obj.heights)]);
             % Tile 2
             nexttile
-            plot(obj.L_33_1,heights);
+            plot(obj.L_33_1,obj.heights);
             title('$L_{33,1}$','Interpreter','Latex', 'FontSize',14)
             ylabel('y (cm)'); xlabel('L (cm)'); grid on;
-            ylim([min(heights) max(heights)]);
+            ylim([min(obj.heights) max(obj.heights)]);
             % Tile 3
             nexttile
             plot(widths, obj.L_11_3);
@@ -986,6 +1014,8 @@ classdef PIVanalysis < handle
             title('$L_{33,3}$','Interpreter','Latex', 'FontSize',14)
             ylabel('L (cm)'); xlabel('x (cm)'); grid on;
             xlim([min(widths) max(widths)]);             
+
+            %obj.tau_intergral_ts = obj.integral_avg/sqrt(obj.tke_avg);
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
         function dissipation(obj)  
@@ -1080,6 +1110,8 @@ classdef PIVanalysis < handle
             %corrected values
             obj.epsilon_corrected = obj.epsilon.*(2-cvalue/100);
             obj.epsilon_avg_corrected = mean(obj.epsilon_corrected(:),'omitnan'); 
+
+            % Kolmogorov length and time scale
             obj.tau_kt_corrected = (obj.nu/obj.epsilon_avg_corrected)^0.5; % time (s)
             obj.eta_kl_corrected = (obj.nu^3/obj.epsilon_avg_corrected)^0.25; %length (cm)
             
@@ -1100,13 +1132,15 @@ classdef PIVanalysis < handle
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
             obj.epsilon_dvdy_dudx = 2.*(4.*obj.dudx_term+obj.dudz_term+...
-                obj.dwdx_term+obj.dwdz_term+2.*obj.uzwx_term);
+            obj.dwdx_term+obj.dwdz_term+2.*obj.uzwx_term);
             obj.epsilon_dvdy_dudx_avg = mean(obj.epsilon_dvdy_dudx(:),'omitnan'); % dissipation rate spatial average
-            obj.tau_kt_dvdy_dudx = (obj.nu/obj.epsilon_avg)^0.5; % time (s)
-            obj.eta_kl_dvdy_dudx = (obj.nu^3/obj.epsilon_avg)^0.25; %length (m)
+
+            % Kolmogorov length and time scale
+            obj.tau_kt_dvdy_dudx = (obj.nu/obj.epsilon_dvdy_dudx_avg)^0.5; % time (s)
+            obj.eta_kl_dvdy_dudx = (obj.nu^3/obj.epsilon_dvdy_dudx_avg)^0.25; %length (m)
             
             %integrated dissipation spectrum
-            R = (deltax/obj.eta_kl); 
+            R = (deltax/obj.eta_kl_dvdy_dudx); 
             x_pos = 2*pi/R;
             
 %             %correction value
@@ -1138,20 +1172,22 @@ classdef PIVanalysis < handle
             %corrected values
             obj.epsilon_dvdy_dudx_corrected = obj.epsilon_dvdy_dudx*(2-cvalue/100);
             obj.epsilon_avg_dvdy_dudx_corrected = mean(obj.epsilon_dvdy_dudx_corrected(:),'omitnan'); 
-            obj.tau_kt_dvdy_dudx_corrected = (obj.nu/obj.epsilon_avg_dvdy_dudx_corrected)^0.5; % time (s)
-            obj.eta_kl_dvdy_dudx_corrected = (obj.nu^3/obj.epsilon_avg_dvdy_dudx_corrected)^0.25; %length (cm)  
+
+            % Kolmogorov length and time scale
+            obj.tau_kt_dvdy_dudx_corrected = (obj.nu/obj.epsilon_avg_dvdy_dudx_corrected)^0.5; % time
+            obj.eta_kl_dvdy_dudx_corrected = (obj.nu^3/obj.epsilon_avg_dvdy_dudx_corrected)^0.25; %length (cm)
             
             %%%%%%%%%% Isotropic assumption 2 - dv/dy = dw/dz %%%%%%%%%% 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
             obj.epsilon_dvdy_dwdz = 2.*(3.*obj.dudx_term+obj.dudz_term+...
-                obj.dwdx_term+2.*obj.dwdz_term+2.*obj.uzwx_term);
+            obj.dwdx_term+2.*obj.dwdz_term+2.*obj.uzwx_term);
             obj.epsilon_dvdy_dwdz_avg = mean(obj.epsilon_dvdy_dwdz(:),'omitnan'); % dissipation rate spatial average
             obj.tau_kt_dvdy_dwdz = (obj.nu/obj.epsilon_avg)^0.5; % time (s)
             obj.eta_kl_dvdy_dwdz = (obj.nu^3/obj.epsilon_avg)^0.25; %length (m)
             
             %integrated dissipation spectrum
-            R = (deltax/obj.eta_kl); 
+            R = (deltax/obj.eta_kl_dvdy_dwdz); 
             x_pos = 2*pi/R;
             
 %             %correction value
@@ -1184,8 +1220,10 @@ classdef PIVanalysis < handle
             %corrected values
             obj.epsilon_dvdy_dwdz_corrected = obj.epsilon_dvdy_dwdz*(2-cvalue/100);
             obj.epsilon_avg_dvdy_dwdz_corrected = mean(obj.epsilon_dvdy_dwdz_corrected(:),'omitnan'); 
-            obj.tau_kt_dvdy_dwdz_corrected = (obj.nu/obj.epsilon_avg_dvdy_dwdz_corrected)^0.5; % time (s)
-            obj.eta_kl_dvdy_dwdz_corrected = (obj.nu^3/obj.epsilon_avg_dvdy_dwdz_corrected)^0.25; %length (cm)
+
+            % Kolmogorov length and time scale
+            obj.tau_kt_dvdy_dwdz_corrected = (obj.nu/obj.epsilon_avg_dvdy_dwdz_corrected)^0.5; % time
+            obj.eta_kl_dvdy_dwdz_corrected = (obj.nu^3/obj.epsilon_avg_dvdy_dwdz_corrected)^0.25; %length (cm)      
             
             %%%%% dissipation plot of all 3 assumptions
             figure (9) 
