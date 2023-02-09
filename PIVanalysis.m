@@ -81,6 +81,10 @@ classdef PIVanalysis < handle
         L_33_1
         L_11_3
         L_33_3
+        L_11_1_mean
+        L_33_1_mean
+        L_11_3_mean
+        L_33_3_mean
         
         target
         lambda_tm_continuity       % Taylor microscale (centimeters) 
@@ -151,7 +155,7 @@ classdef PIVanalysis < handle
             %%new tests Nov 2022 
             %load('G:\J20 Tests\4_5V_1sec_60percent_2_5ms_withlid\PIVlab_data','u_original','w_original')
             %load('/Users/almccutc/Desktop/PIVlab_results5V_1sec15p','u_original','v_original','calxy')
-            load('/Users/almccutc/Desktop/PIVlab_results7V','u_original','v_original','calxy')
+            load('/Users/almccutc/Desktop/PIVlab_results7V_1sec_15p','u_original','v_original','calxy')
             %load('PIVlab_results','u_original','v_original','calxy')
 
             obj.u_original = u_original; %(m/s)
@@ -162,13 +166,13 @@ classdef PIVanalysis < handle
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
         function allfunctions(obj)
             reshape(obj); % %this works well for PIVlab sessions
-            %checkHistogram(obj);
-            %applyAGWfilter(obj);
-            %medfilter(obj);
+            checkHistogram(obj);
+            applyAGWfilter(obj);
+            medfilter(obj);
             velocityCalculations(obj);
-            %velocityPlots(obj)
+            velocityPlots(obj)
             integrallength(obj)
-            %dissipation(obj);
+            dissipation(obj);
             %delaunyinterpolation(obj); 
             %spatialspectra(obj);
             %temporalspectra(obj);
@@ -178,23 +182,23 @@ classdef PIVanalysis < handle
         function reshape(obj)
          obj.u_original = cell2mat(permute(obj.u_original',[1,3,2])).*100; 
          obj.w_original = cell2mat(permute(obj.w_original',[1,3,2])).*100;
+% 
+         %uncomment for using agw and nan filters
+         obj.u_original = obj.u_original(:,2:249,:); 
+         obj.w_original = obj.w_original(:,2:249,:);
 
-%          uncomment for using agw and nan filters
-%          obj.u_original = obj.u_original(:,2:249,1:10); 
-%          obj.w_original = obj.w_original(:,2:249,1:10);
+         %uncomment for using agw and nan filters
+         obj.u_original(isnan(obj.u_original)) = NaN;
+         obj.w_original(isnan(obj.w_original)) = NaN;
 % 
-%          uncomment for using agw and nan filters
-%          obj.u_original(isnan(obj.u_original)) = NaN;
-%          obj.w_original(isnan(obj.w_original)) = NaN;
-% 
-         obj.u_nanfilter = obj.u_original(:,32:217,1:5); 
-         obj.w_nanfilter = obj.w_original(:,32:217,1:5);
-         
-%          Matches NaN values for both u and w (i.e. if u has a NaN value at
-%          (1,1,1) and v does not, these lines will assign a NaN value at
-%          (1,1,1) for v to match u. 
-         obj.u_nanfilter(isnan(obj.u_nanfilter)) = NaN;
-         obj.w_nanfilter(isnan(obj.w_nanfilter)) = NaN;
+%          obj.u_nanfilter = obj.u_original(:,1:248,1:5); 
+%          obj.w_nanfilter = obj.w_original(:,1:248,1:5);
+%          
+% %          Matches NaN values for both u and w (i.e. if u has a NaN value at
+% %          (1,1,1) and v does not, these lines will assign a NaN value at
+% %          (1,1,1) for v to match u. 
+%          obj.u_nanfilter(isnan(obj.u_nanfilter)) = NaN;
+%          obj.w_nanfilter(isnan(obj.w_nanfilter)) = NaN;
 
         end
         function checkHistogram(obj)
@@ -676,7 +680,7 @@ classdef PIVanalysis < handle
             obj.isotropy_avg = mean(obj.isotropy,'all','omitnan'); 
             obj.isotropy_median = median(obj.isotropy,'all','omitnan'); 
 
-            obj.yaxis = (-Ny/2+3:1:Ny/2+3)*obj.calibration*obj.subwindow; %converts subwindow count to cm
+            obj.yaxis = (-Ny/2:1:Ny/2)*obj.calibration*obj.subwindow; %converts subwindow count to cm
             obj.xaxis = (-Nx/2:1:Nx/2)*obj.calibration*obj.subwindow; %converts subwindow count to cm
 
             %mean flow strength 
@@ -697,77 +701,87 @@ classdef PIVanalysis < handle
             %Time average for each subwindow                            
             figure (1) 
             subplot(2,2,1)
-            imagesc(flipud(obj.u_mean), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.u_mean), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal') 
-            title(['$\overline{U}:\:',(num2str(obj.u_mean_savg,3)),'\:cm/s\;M_d:\:',(num2str(obj.u_mean_median,3)),'\:cm/s$'],'Interpreter','latex')
+            title(['$\overline{U}:\:',(num2str(obj.u_mean_savg,3)),'\:cm/s\;\;M_d:\:',(num2str(obj.u_mean_median,3)),'\:cm/s$'],'Interpreter','latex', 'FontSize',14)
             ylabel('cm')
             xlabel('cm')
 
             subplot(2,2,2)
-            imagesc(flipud(obj.w_mean), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.w_mean), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title(['$\overline{W}:\:',(num2str(obj.w_mean_savg,3)),'\:cm/s\;M_d:\:',(num2str(obj.w_mean_median,3)),'\:cm/s$'],'Interpreter','latex')
+            title(['$\overline{W}:\:',(num2str(obj.w_mean_savg,3)),'\:cm/s\;\;M_d:\:',(num2str(obj.w_mean_median,3)),'\:cm/s$'],'Interpreter','latex', 'FontSize',14)
             ylabel('cm')
             xlabel('cm')
 
             %RMS velocity for each subwindow
             subplot(2,2,3)
-            imagesc(flipud(obj.u_rms), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.u_rms), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title(['$\overline{u_{rms}}:\:',(num2str(obj.u_rms_savg,3)),'\:cm/s\;M_d:\:',(num2str(obj.u_rms_median,3)),'\:cm/s$'],'Interpreter','latex')
+            title(['$\overline{u_{rms}}:\:',(num2str(obj.u_rms_savg,3)),'\:cm/s\;\;M_d:\:',(num2str(obj.u_rms_median,3)),'\:cm/s$'],'Interpreter','latex', 'FontSize',14)
             ylabel('cm')
             xlabel('cm')
 
             subplot(2,2,4)
-            imagesc(flipud(obj.w_rms), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.w_rms), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title(['$\overline{w_{rms}}:\:',(num2str(obj.w_rms_savg,3)),'\:cm/s\;M_d:\:',(num2str(obj.w_rms_median,3)),'\:cm/s$'],'Interpreter','latex')
+            title(['$\overline{w_{rms}}:\:',(num2str(obj.w_rms_savg,3)),'\:cm/s\;\;M_d:\:',(num2str(obj.w_rms_median,3)),'\:cm/s$'],'Interpreter','latex', 'FontSize',14)
             ylabel('cm')
             xlabel('cm')
             set(gcf,'Position',[700 300 1000 700])
 
             figure (2)
-            imagesc(flipud(obj.tke), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.tke), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title(['$\overline{k}:\:',(num2str(obj.tke_avg,3)),'\:cm^2/s^2\;M_d:\:',(num2str(obj.tke_median,3)),'\:cm^2/s^2$'],'Interpreter','latex')
+            title(['$\overline{k}:\:',(num2str(obj.tke_avg,3)),'\:cm^2/s^2\;\;M_d:\:',(num2str(obj.tke_median,3)),'\:cm^2/s^2$'],'Interpreter','latex', 'FontSize',14)
             ylabel('cm')
             xlabel('cm')
             
             figure (3)
-            imagesc(flipud(obj.isotropy), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.isotropy), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title(['$Isotropy\:-\:\frac{u_{rms}}{w_{rms}}:\:',(num2str(obj.isotropy_avg,3)),'\;M_d:\:',(num2str(obj.isotropy_median,3)),'$'],'Interpreter','latex')
+            title(['$Isotropy\:-\:\frac{u_{rms}}{w_{rms}}:\:',(num2str(obj.isotropy_avg,3)),'\;\;M_d:\:',(num2str(obj.isotropy_median,3)),'$'],'Interpreter','latex', 'FontSize',14)
             ylabel('cm')
             xlabel('cm')
             
             figure (4) 
-            subplot(1,3,1)
-            imagesc(flipud(obj.m1*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            subplot(1,4,1)
+            imagesc((obj.m1*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title(['$\overline{M_1}:\:',(num2str(obj.m1_avg*100,3)),'\: \% \;M_d:\:',(num2str(obj.m1_median*100,3)),'\:\%$'],'Interpreter','latex')
+            title(['$\overline{M_1}:\:',(num2str(obj.m1_avg*100,3)),'\: \% \;\;M_d:\:',(num2str(obj.m1_median*100,3)),'\:\%$'],'Interpreter','latex', 'FontSize',14)
             ylabel('cm')
             xlabel('cm')
 
-            subplot(1,3,2)
-            imagesc(flipud(obj.m3*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            subplot(1,4,2)
+            imagesc((obj.m3*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')         
-            title(['$\overline{M_3}:\:',(num2str(obj.m3_avg*100,3)),'\:\%\;M_d:\:',(num2str(obj.m3_median*100,3)),'\:\% $'],'Interpreter','latex')
+            title(['$\overline{M_3}:\:',(num2str(obj.m3_avg*100,3)),'\:\%\;\;M_d:\:',(num2str(obj.m3_median*100,3)),'\:\% $'],'Interpreter','latex', 'FontSize',14)
             ylabel('cm')
             xlabel('cm')
             
-            subplot(1,3,3)
-            imagesc(flipud(obj.mstar*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            subplot(1,4,3)
+            imagesc((obj.mstar*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')       
-            title(['$\overline{M^*}:\:',(num2str(obj.mstar_avg*100,3)),'\:\%\;M_d:\:',(num2str(obj.mstar_median*100,3)),'\:\% $'],'Interpreter','latex')
+            title(['$\overline{M^*}:\:',(num2str(obj.mstar_avg*100,3)),'\:\%\;\;M_d:\:',(num2str(obj.mstar_median*100,3)),'\:\% $'],'Interpreter','latex', 'FontSize',14)
+            ylabel('cm')
+            xlabel('cm')
+            set(gcf,'Position',[700 300 1240 300])
+
+            subplot(1,4,4)
+            imagesc((obj.mstar*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            colorbar
+            caxis([0 10])
+            set(gca,'YDir','normal')       
+            title(['$M^*\:10 \%$ value limit'],'Interpreter','latex', 'FontSize',14)
             ylabel('cm')
             xlabel('cm')
             set(gcf,'Position',[700 300 1240 300])
@@ -898,7 +912,7 @@ classdef PIVanalysis < handle
             
              
             %spatial, horizontal autocorrelation calculation, for the case of an even # of vertical and horizontal subwindows          
-            for row=1:Nx % calculated at every height for each subwindow 
+            for row=1:Ny % calculated at every height for each subwindow 
                 for radius=0.5:1:x_c-1
             
                     %11,1 - longitudinal, Horizontal velocity, horizontal separation
@@ -912,7 +926,7 @@ classdef PIVanalysis < handle
             end
             
             %spatial, vertical autocorrelation calculation, for the case of an even # of vertical and horizontal subwindows          
-            for column=1:Ny % calculated at every width for each subwindow 
+            for column=1:Nx % calculated at every width for each subwindow 
                 for radius=0.5:1:y_c-1
             
                     %11,3 - transverse, Horizontal velocity, vertical separation
@@ -939,7 +953,9 @@ classdef PIVanalysis < handle
             
                 % Minimize to find Lstar
                 obj.L_11_1(row,1)=fminunc(obj.g_11_1,L0); 
+                obj.L_11_1_mean = mean(obj.L_11_1);
                 L_33_1(row,1)=fminunc(obj.g_33_1,L0); obj.L_33_1 = L_33_1*.5;
+                obj.L_33_1_mean = mean(obj.L_33_1);
             
                 exp_11_1(row,:)=newExpFuncG(rad_x,obj.L_11_1(row,1)); 
                 exp_33_1(row,:)=newExpFuncG_transverse(rad_x,obj.L_33_1(row,1)); 
@@ -959,7 +975,9 @@ classdef PIVanalysis < handle
             
                 % Minimize to find Lstar
                 L_11_3(column,1)=fminunc(obj.g_11_3,L0); obj.L_11_3 = L_11_3*.5;
+                obj.L_11_3_mean = mean(obj.L_11_3);
                 obj.L_33_3(column,1)=fminunc(obj.g_33_3,L0); 
+                obj.L_33_3_mean = mean(obj.L_33_3);
                
             
                 exp_11_3(column,:)=newExpFuncG_transverse(rad_y,obj.L_11_3(column,1)); 
@@ -974,19 +992,19 @@ classdef PIVanalysis < handle
             grid on;
             % Tile 1
             nexttile, plot(rad_x,obj.a_u_11_1(Ny/2,:),'k.',rad_x,exp_11_1(Ny/2,:),'k');
-            title('11,1 Autocorrelation - horizontal center','Interpreter','Latex', 'FontSize',14)
+            title('$a_{11,1}(r)$ - horizontal center','Interpreter','Latex', 'FontSize',14)
             grid on;
             % Tile 2
             nexttile, plot(rad_x,obj.a_w_33_1(Ny/2,:),'k.',rad_x,exp_33_1(Ny/2,:),'k');
-            title('33,1 Autocorrelation - horizontal center','Interpreter','Latex', 'FontSize',14)
+            title('$a_{33,1}(r)$ - horizontal center','Interpreter','Latex', 'FontSize',14)
             grid on;
             % Tile 3
             nexttile, plot(rad_y,obj.a_u_11_3(Nx/2,:),'k.',rad_y,exp_11_3(Nx/2,:),'k');
-            title('11,3 Autocorrelation - vertical center','Interpreter','Latex', 'FontSize',14)
+            title('$a_{11,3}(r)$ - vertical center','Interpreter','Latex', 'FontSize',14)
             grid on;
             % Tile 4
             nexttile, plot(rad_y,obj.a_w_33_3(Nx/2,:),'k.',rad_y,exp_33_3(Nx/2,:),'k');
-            title('33,3 Autocorrelation - vertical center','Interpreter','Latex', 'FontSize',14)
+            title('$a_{33,3}(r)$ - vertical center','Interpreter','Latex', 'FontSize',14)
             grid on;
             lg  = legend('Actual','Predicted'); lg.Layout.Tile = 'East'; % <-- Legend placement with tiled layout
                 
@@ -997,25 +1015,26 @@ classdef PIVanalysis < handle
             % Tile 1
             nexttile
             plot(obj.L_11_1,obj.heights);
-            title('$L_{11,1}$','Interpreter','Latex', 'FontSize',14)
+            title(['$\overline{L_{11,1}}\::\:',(num2str(obj.L_11_1_mean,3)),'\:cm$'],'Interpreter','latex', 'FontSize',14)
             ylabel('y (cm)'); xlabel('L (cm)'); grid on;
             ylim([min(obj.heights) max(obj.heights)]);
             % Tile 2
             nexttile
             plot(obj.L_33_1,obj.heights);
-            title('$L_{33,1}$','Interpreter','Latex', 'FontSize',14)
+            title(['$\overline{L_{33,1}}\::\:',(num2str(obj.L_33_1_mean,3)),'\:cm$'],'Interpreter','latex', 'FontSize',14)
             ylabel('y (cm)'); xlabel('L (cm)'); grid on;
             ylim([min(obj.heights) max(obj.heights)]);
             % Tile 3
             nexttile
             plot(obj.widths, obj.L_11_3);
-            title('$L_{11,3}$','Interpreter','Latex', 'FontSize',14)
+            title(['$\overline{L_{11,3}}\::\:',(num2str(obj.L_11_3_mean,3)),'\:cm$'],'Interpreter','latex', 'FontSize',14)
+            %
             ylabel('L (cm)'); xlabel('x (cm)'); grid on;
             xlim([min(obj.widths) max(obj.widths)]);
             % Tile 4
             nexttile
             plot(obj.widths, obj.L_33_3);
-            title('$L_{33,3}$','Interpreter','Latex', 'FontSize',14)
+            title(['$\overline{L_{33,3}}\::\:',(num2str(obj.L_33_3_mean,3)),'\:cm$'],'Interpreter','latex', 'FontSize',14)
             ylabel('L (cm)'); xlabel('x (cm)'); grid on;
             xlim([min(obj.widths) max(obj.widths)]);             
 
@@ -1063,15 +1082,15 @@ classdef PIVanalysis < handle
             obj.uzwx_term = obj.nu.*mean((((obj.dudz(2:Ny,2:Nx,:)./deltax).*(obj.dwdx(2:Ny,2:Nx,:)./deltax))),3,'omitnan'); %time average
 
             figure (8)
-            plot(flip(mean(obj.dudx_term,2,'omitnan')),obj.heights(1:Ny-1),'-r',...
-                flip(mean(obj.dwdz_term,2,'omitnan')),obj.heights(1:Ny-1),'--r',...
-                flip(mean(obj.dudz_term,2,'omitnan')),obj.heights(1:Ny-1),'-k',...
-                flip(mean(obj.dwdx_term,2,'omitnan')),obj.heights(1:Ny-1),'--k',...
-                flip(mean(obj.uxwz_term,2,'omitnan')),obj.heights(1:Ny-1),'-b',flip(mean...
+            plot((mean(obj.dudx_term,2,'omitnan')),obj.heights(1:Ny-1),'-r',...
+                (mean(obj.dwdz_term,2,'omitnan')),obj.heights(1:Ny-1),'--r',...
+                (mean(obj.dudz_term,2,'omitnan')),obj.heights(1:Ny-1),'-k',...
+                (mean(obj.dwdx_term,2,'omitnan')),obj.heights(1:Ny-1),'--k',...
+                (mean(obj.uxwz_term,2,'omitnan')),obj.heights(1:Ny-1),'-b',(mean...
                 (obj.uzwx_term,2,'omitnan')),obj.heights(1:Ny-1),'-g');
-            title('Dissipation Components')
+            title('Dissipation Components','Interpreter','latex', 'FontSize',16)
             legend('$\overline{(\frac{\partial u}{\partial x})^2}$','$\overline{(\frac{\partial w}{\partial z})^2}$','$\overline{(\frac{\partial u}{\partial z})^2}$','$\overline{(\frac{\partial w}{\partial x})^2}$',...
-                '$\overline{(\frac{\partial u}{\partial x} \frac{\partial w}{\partial z})}$','$\overline{(\frac{\partial u}{\partial x} \frac{\partial w}{\partial z})}$','Interpreter','Latex')
+                '$\overline{(\frac{\partial u}{\partial x} \frac{\partial w}{\partial z})}$','$\overline{(\frac{\partial u}{\partial x} \frac{\partial w}{\partial z})}$','Interpreter','Latex', 'FontSize',14)
             ylabel('y (cm)'); xlabel('cm^2/s^3'); grid on;
             
             %%%%%%%%%% continuity assumption
@@ -1130,9 +1149,6 @@ classdef PIVanalysis < handle
 %             title('Normalized dissipation spectrum and cumulative dissipation')
 %             legend('Normalized dissipation spectrum','Cumulative dissipation')
 
-              pause
-              close all
-
             %%%%%%%%%% Isotropic assumption 1 - dv/dy = du/dx %%%%%%%%%% 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -1171,7 +1187,6 @@ classdef PIVanalysis < handle
 
             uiwait(f)
             cvalue = str2double(get(e,'String'));
-            pause
             close all           
             
             %corrected values
@@ -1235,29 +1250,26 @@ classdef PIVanalysis < handle
             %%%%% dissipation plot of all 3 assumptions
             figure (9) 
             subplot(1,3,1)
-            imagesc(flipud(obj.epsilon_corrected), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.epsilon_corrected), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')
-            title(['$Continuity:\-:\ \overline{\epsilon}:\::\',(num2str(obj.epsilon_avg_corrected,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_corrected,3)),'\:cm^2/s^3$'],'Interpreter','latex')
+            title(['$Continuity\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_corrected,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_corrected,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
             ylabel('cm')
             xlabel('cm')
-            clim([0 10])
             subplot(1,3,2)
-            imagesc(flipud(obj.epsilon_dvdy_dudx_corrected), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.epsilon_dvdy_dudx_corrected), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')      
-            title(['$\frac{\partial v}{\partial y}=\frac{\partial u}{\partial x}:\-:\ \overline{\epsilon}:\::\',(num2str(obj.epsilon_avg_dvdy_dudx_corrected,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_dvdy_dudx_corrected,3)),'\:cm^2/s^3$'],'Interpreter','latex')
+            title(['$\frac{\partial v}{\partial y}=\frac{\partial u}{\partial x}\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_dvdy_dudx_corrected,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_dvdy_dudx_corrected,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
             ylabel('cm')
             xlabel('cm')
-            clim([20 50])
             subplot(1,3,3)
-            imagesc(flipud(obj.epsilon_dvdy_dwdz_corrected), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.epsilon_dvdy_dwdz_corrected), 'XData', obj.xaxis, 'YData',obj.yaxis)
             colorbar
             set(gca,'YDir','normal')    
-            title(['$\frac{\partial v}{\partial y}=\frac{\partial w}{\partial x}:\-:\ \overline{\epsilon}:\::\',(num2str(obj.epsilon_avg_dvdy_dwdz_corrected,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_dvdy_dwdz_corrected,3)),'\:cm^2/s^3$'],'Interpreter','latex')
+            title(['$\frac{\partial v}{\partial y}=\frac{\partial w}{\partial x}\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_dvdy_dwdz_corrected,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_dvdy_dwdz_corrected,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
             ylabel('cm')
             xlabel('cm')
-            clim([20 50])
             set(gcf,'Position',[700 300 1240 300])
 
 
