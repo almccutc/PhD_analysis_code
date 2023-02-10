@@ -155,7 +155,7 @@ classdef PIVanalysis < handle
             %%new tests Nov 2022 
             %load('G:\J20 Tests\4_5V_1sec_60percent_2_5ms_withlid\PIVlab_data','u_original','w_original')
             %load('/Users/almccutc/Desktop/PIVlab_results5V_1sec15p','u_original','v_original','calxy')
-            load('/Users/almccutc/Desktop/PIVlab_results7V_1sec_15p','u_original','v_original','calxy')
+            load('/Users/almccutc/Desktop/PIVlab_results6V_1sec_30p','u_original','v_original','calxy')
             %load('PIVlab_results','u_original','v_original','calxy')
 
             obj.u_original = u_original; %(m/s)
@@ -179,13 +179,16 @@ classdef PIVanalysis < handle
             
         end    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-        function reshape(obj)
+function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 cm FOV
          obj.u_original = cell2mat(permute(obj.u_original',[1,3,2])).*100; 
          obj.w_original = cell2mat(permute(obj.w_original',[1,3,2])).*100;
 % 
-         %uncomment for using agw and nan filters
-         obj.u_original = obj.u_original(:,2:249,:); 
-         obj.w_original = obj.w_original(:,2:249,:);
+%          %uncomment for using agw and nan filters
+%          obj.u_original = obj.u_original(:,:,1:10); 
+%          obj.w_original = obj.w_original(:,:,1:10);
+
+         obj.u_original = obj.u_original(1:176,37:212,1:10); 
+         obj.w_original = obj.w_original(1:176,37:212,1:10);
 
          %uncomment for using agw and nan filters
          obj.u_original(isnan(obj.u_original)) = NaN;
@@ -680,8 +683,8 @@ classdef PIVanalysis < handle
             obj.isotropy_avg = mean(obj.isotropy,'all','omitnan'); 
             obj.isotropy_median = median(obj.isotropy,'all','omitnan'); 
 
-            obj.yaxis = (-Ny/2:1:Ny/2)*obj.calibration*obj.subwindow; %converts subwindow count to cm
-            obj.xaxis = (-Nx/2:1:Nx/2)*obj.calibration*obj.subwindow; %converts subwindow count to cm
+            obj.yaxis = ([-Ny/2:1:-1 1:1:Ny/2])*obj.calibration*obj.subwindow; %converts subwindow count to cm
+            obj.xaxis = ([-Nx/2:1:-1 1:1:Nx/2])*obj.calibration*obj.subwindow; %converts subwindow count to cm
 
             %mean flow strength 
             obj.m1 = obj.u_mean./obj.u_rms; 
@@ -1090,7 +1093,7 @@ classdef PIVanalysis < handle
                 (obj.uzwx_term,2,'omitnan')),obj.heights(1:Ny-1),'-g');
             title('Dissipation Components','Interpreter','latex', 'FontSize',16)
             legend('$\overline{(\frac{\partial u}{\partial x})^2}$','$\overline{(\frac{\partial w}{\partial z})^2}$','$\overline{(\frac{\partial u}{\partial z})^2}$','$\overline{(\frac{\partial w}{\partial x})^2}$',...
-                '$\overline{(\frac{\partial u}{\partial x} \frac{\partial w}{\partial z})}$','$\overline{(\frac{\partial u}{\partial x} \frac{\partial w}{\partial z})}$','Interpreter','Latex', 'FontSize',14)
+                '$\overline{(\frac{\partial u}{\partial x} \frac{\partial w}{\partial z})}$','$\overline{(\frac{\partial u}{\partial x} \frac{\partial w}{\partial z})}$','Interpreter','Latex', 'FontSize',14,'Location','northeastoutside')
             ylabel('y (cm)'); xlabel('cm^2/s^3'); grid on;
             
             %%%%%%%%%% continuity assumption
