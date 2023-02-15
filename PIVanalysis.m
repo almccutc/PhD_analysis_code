@@ -10,10 +10,7 @@ classdef PIVanalysis < handle
         %g = 9.80665                    % (m/s2)                           
         mu = 2.5*1.81e-5                % (kg/m s) dynamic viscosity, u
         nu = 0.010034;                  % (cm2/s) % https://www.omnicalculator.com/physics/water-viscosity
-        %nu =0.0000010034;              % m/s2 
         subwindow = 16;                 %subwindow size in pixels
-        yaxis
-        xaxis
         calibration
         heights
         widths
@@ -155,9 +152,7 @@ classdef PIVanalysis < handle
             %%new tests Nov 2022 
             %load('G:\J20 Tests\4_5V_1sec_60percent_2_5ms_withlid\PIVlab_data','u_original','w_original')
             %load('/Users/almccutc/Desktop/PIVlab_results5V_1sec15p','u_original','v_original','calxy')
-            load('/Users/almccutc/Desktop/PIVlab_results6V_1sec_30p','u_original','v_original','calxy')
-            %load('PIVlab_results','u_original','v_original','calxy')
-
+            load('Data/PIVlab_results8V_1sec_30p','u_original','v_original','calxy')
             obj.u_original = u_original; %(m/s)
             obj.w_original = v_original; %(m/s)
             obj.calibration = calxy*100; % Ex: 4e-05 cm/px
@@ -179,7 +174,7 @@ classdef PIVanalysis < handle
             
         end    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    
-function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 cm FOV
+        function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 cm FOV
          obj.u_original = cell2mat(permute(obj.u_original',[1,3,2])).*100; 
          obj.w_original = cell2mat(permute(obj.w_original',[1,3,2])).*100;
 % 
@@ -187,8 +182,13 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
 %          obj.u_original = obj.u_original(:,:,1:10); 
 %          obj.w_original = obj.w_original(:,:,1:10);
 
-         obj.u_original = obj.u_original(1:176,37:212,1:10); 
-         obj.w_original = obj.w_original(1:176,37:212,1:10);
+         obj.u_original = obj.u_original(1:176,37:212,:); 
+         obj.w_original = obj.w_original(1:176,37:212,:);
+
+         [Nx,Ny,~] = size(obj.u_original);
+
+         obj.heights=([-Ny/2:1:-1 1:1:Ny/2]).*obj.calibration.*obj.subwindow; %calibrate to cm
+         obj.widths=([-Nx/2:1:-1 1:1:Nx/2]).*obj.calibration.*obj.subwindow; %calibrate to cm
 
          %uncomment for using agw and nan filters
          obj.u_original(isnan(obj.u_original)) = NaN;
@@ -238,7 +238,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             obj.u_original=permute(obj.u_original,[3 1 2]); obj.w_original=permute(obj.w_original,[3 1 2]);
 
             [Nt,Nx,Ny] = size(obj.u_original);
-
+        
             ucheck = reshape(obj.u_original,1,Nx*Ny*Nt); wcheck = reshape(obj.w_original,1,Nx*Ny*Nt);
 
             uresh = reshape(obj.u_original,Nt*Nx,Ny); vresh = reshape(obj.w_original,Nt*Nx,Ny);
@@ -476,7 +476,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
         end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         function medfilter(obj)
-            obj.target = 8; %initial filter value guess 
+            obj.target = 5; %initial filter value guess 
             
             [Nt,Nx,Ny] = size(obj.u_agw);
             uclean_save = zeros(Nt,Nx,Ny); %preallocate 
@@ -553,7 +553,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
                     continue    
                 else    
                     m = menu(['Yes if to continue through time, No for new target ' ...
-                        'value (originally 0.15), All to apply filter at all ' ...
+                        'value (originally 5), All to apply filter at all ' ...
                         'time steps, Exit to stop program., Skip to TimeStep'], ...
                         'Yes','No', 'All', 'Exit', 'Select T.S.');
                 end 
@@ -683,9 +683,6 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             obj.isotropy_avg = mean(obj.isotropy,'all','omitnan'); 
             obj.isotropy_median = median(obj.isotropy,'all','omitnan'); 
 
-            obj.yaxis = ([-Ny/2:1:-1 1:1:Ny/2])*obj.calibration*obj.subwindow; %converts subwindow count to cm
-            obj.xaxis = ([-Nx/2:1:-1 1:1:Nx/2])*obj.calibration*obj.subwindow; %converts subwindow count to cm
-
             %mean flow strength 
             obj.m1 = obj.u_mean./obj.u_rms; 
             obj.m1_avg = mean(obj.m1,'all','omitnan');
@@ -704,7 +701,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             %Time average for each subwindow                            
             figure (1) 
             subplot(2,2,1)
-            imagesc((obj.u_mean), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.u_mean), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal') 
             title(['$\overline{U}:\:',(num2str(obj.u_mean_savg,3)),'\:cm/s\;\;M_d:\:',(num2str(obj.u_mean_median,3)),'\:cm/s$'],'Interpreter','latex', 'FontSize',14)
@@ -712,7 +709,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             xlabel('cm')
 
             subplot(2,2,2)
-            imagesc((obj.w_mean), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.w_mean), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')
             title(['$\overline{W}:\:',(num2str(obj.w_mean_savg,3)),'\:cm/s\;\;M_d:\:',(num2str(obj.w_mean_median,3)),'\:cm/s$'],'Interpreter','latex', 'FontSize',14)
@@ -721,7 +718,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
 
             %RMS velocity for each subwindow
             subplot(2,2,3)
-            imagesc((obj.u_rms), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.u_rms), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')
             title(['$\overline{u_{rms}}:\:',(num2str(obj.u_rms_savg,3)),'\:cm/s\;\;M_d:\:',(num2str(obj.u_rms_median,3)),'\:cm/s$'],'Interpreter','latex', 'FontSize',14)
@@ -729,7 +726,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             xlabel('cm')
 
             subplot(2,2,4)
-            imagesc((obj.w_rms), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.w_rms), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')
             title(['$\overline{w_{rms}}:\:',(num2str(obj.w_rms_savg,3)),'\:cm/s\;\;M_d:\:',(num2str(obj.w_rms_median,3)),'\:cm/s$'],'Interpreter','latex', 'FontSize',14)
@@ -738,7 +735,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             set(gcf,'Position',[700 300 1000 700])
 
             figure (2)
-            imagesc((obj.tke), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.tke), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')
             title(['$\overline{k}:\:',(num2str(obj.tke_avg,3)),'\:cm^2/s^2\;\;M_d:\:',(num2str(obj.tke_median,3)),'\:cm^2/s^2$'],'Interpreter','latex', 'FontSize',14)
@@ -746,7 +743,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             xlabel('cm')
             
             figure (3)
-            imagesc((obj.isotropy), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.isotropy), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')
             title(['$Isotropy\:-\:\frac{u_{rms}}{w_{rms}}:\:',(num2str(obj.isotropy_avg,3)),'\;\;M_d:\:',(num2str(obj.isotropy_median,3)),'$'],'Interpreter','latex', 'FontSize',14)
@@ -755,7 +752,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             
             figure (4) 
             subplot(1,4,1)
-            imagesc((obj.m1*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.m1*100), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')
             title(['$\overline{M_1}:\:',(num2str(obj.m1_avg*100,3)),'\: \% \;\;M_d:\:',(num2str(obj.m1_median*100,3)),'\:\%$'],'Interpreter','latex', 'FontSize',14)
@@ -763,7 +760,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             xlabel('cm')
 
             subplot(1,4,2)
-            imagesc((obj.m3*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.m3*100), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')         
             title(['$\overline{M_3}:\:',(num2str(obj.m3_avg*100,3)),'\:\%\;\;M_d:\:',(num2str(obj.m3_median*100,3)),'\:\% $'],'Interpreter','latex', 'FontSize',14)
@@ -771,7 +768,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             xlabel('cm')
             
             subplot(1,4,3)
-            imagesc((obj.mstar*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.mstar*100), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')       
             title(['$\overline{M^*}:\:',(num2str(obj.mstar_avg*100,3)),'\:\%\;\;M_d:\:',(num2str(obj.mstar_median*100,3)),'\:\% $'],'Interpreter','latex', 'FontSize',14)
@@ -780,7 +777,7 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             set(gcf,'Position',[700 300 1240 300])
 
             subplot(1,4,4)
-            imagesc((obj.mstar*100), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.mstar*100), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             caxis([0 10])
             set(gca,'YDir','normal')       
@@ -907,8 +904,6 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             y_c=(Ny+1)/2; % determines the centerline position
             rad_x =[0,(obj.subwindow:obj.subwindow*2:Nx*obj.subwindow).*obj.calibration]; %calibrate to cm
             rad_y =[0,(obj.subwindow:obj.subwindow*2:Ny*obj.subwindow).*obj.calibration]; %calibrate to cm
-            obj.heights=([-Ny/2:1:-1 1:1:Ny/2]).*obj.calibration.*obj.subwindow; %calibrate to cm
-            obj.widths=([-Nx/2:1:-1 1:1:Nx/2]).*obj.calibration.*obj.subwindow; %calibrate to cm
             
             obj.a_u_11_1 = [ones([Ny 1]) NaN([Ny Nx/2])]; obj.a_w_33_1 = [ones([Ny 1]) NaN([Ny Nx/2])];
             obj.a_u_11_3 = [ones([Nx 1]) NaN([Nx Ny/2])]; obj.a_w_33_3 = [ones([Nx 1]) NaN([Nx Ny/2])];
@@ -1052,9 +1047,6 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             deltax = obj.subwindow*obj.calibration; %distance between velocity vectors (cm)
             
             [Ny,Nx,Nt] = size(obj.u_f); %Ny-# of rows, Nx-# of columns
-            obj.yaxis = (-Ny/2:20:Ny/2)*obj.calibration*obj.subwindow; %converts subwindow count to cm
-            obj.xaxis = (-Nx/2:20:Nx/2)*obj.calibration*obj.subwindow; %converts subwindow count to cm
-            obj.heights = ([-Ny/2:1:-1 1:1:Ny/2]).*obj.calibration.*obj.subwindow; %calibrate to cm
             
             %zero matrices
             z_u = zeros(Ny,1,Nt); 
@@ -1253,21 +1245,21 @@ function reshape(obj) % original is 186 by 249 subwindows, trimmed to 10 by 10 c
             %%%%% dissipation plot of all 3 assumptions
             figure (9) 
             subplot(1,3,1)
-            imagesc((obj.epsilon_corrected), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.epsilon_corrected), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')
             title(['$Continuity\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_corrected,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_corrected,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
             ylabel('cm')
             xlabel('cm')
             subplot(1,3,2)
-            imagesc((obj.epsilon_dvdy_dudx_corrected), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.epsilon_dvdy_dudx_corrected), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')      
             title(['$\frac{\partial v}{\partial y}=\frac{\partial u}{\partial x}\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_dvdy_dudx_corrected,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_dvdy_dudx_corrected,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
             ylabel('cm')
             xlabel('cm')
             subplot(1,3,3)
-            imagesc((obj.epsilon_dvdy_dwdz_corrected), 'XData', obj.xaxis, 'YData',obj.yaxis)
+            imagesc((obj.epsilon_dvdy_dwdz_corrected), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')    
             title(['$\frac{\partial v}{\partial y}=\frac{\partial w}{\partial x}\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_dvdy_dwdz_corrected,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_dvdy_dwdz_corrected,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
