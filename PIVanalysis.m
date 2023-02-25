@@ -152,7 +152,7 @@ classdef PIVanalysis < handle
             %%new tests Nov 2022 
             %load('G:\J20 Tests\4_5V_1sec_60percent_2_5ms_withlid\PIVlab_data','u_original','w_original')
             %load('/Users/almccutc/Desktop/PIVlab_results5V_1sec15p','u_original','v_original','calxy')
-            load('Data/PIVlab_results8V_1sec_30p','u_original','v_original','calxy')
+            load('Data/PIVlab_results6V_1_4sec_15p','u_original','v_original','calxy')
             obj.u_original = u_original; %(m/s)
             obj.w_original = v_original; %(m/s)
             obj.calibration = calxy*100; % Ex: 4e-05 cm/px
