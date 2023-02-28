@@ -152,7 +152,7 @@ classdef PIVanalysis < handle
             %%new tests Nov 2022 
             %load('G:\J20 Tests\4_5V_1sec_60percent_2_5ms_withlid\PIVlab_data','u_original','w_original')
             %load('/Users/almccutc/Desktop/PIVlab_results5V_1sec15p','u_original','v_original','calxy')
-            load('Data/PIVlab_results6V_1_4sec_15p','u_original','v_original','calxy')
+            load('Data/PIVlab_results_6V_1sec_30p_noBS','u_original','v_original','calxy')
             obj.u_original = u_original; %(m/s)
             obj.w_original = v_original; %(m/s)
             obj.calibration = calxy*100; % Ex: 4e-05 cm/px
@@ -1085,7 +1085,7 @@ classdef PIVanalysis < handle
                 (obj.uzwx_term,2,'omitnan')),obj.heights(1:Ny-1),'-g');
             title('Dissipation Components','Interpreter','latex', 'FontSize',16)
             legend('$\overline{(\frac{\partial u}{\partial x})^2}$','$\overline{(\frac{\partial w}{\partial z})^2}$','$\overline{(\frac{\partial u}{\partial z})^2}$','$\overline{(\frac{\partial w}{\partial x})^2}$',...
-                '$\overline{(\frac{\partial u}{\partial x} \frac{\partial w}{\partial z})}$','$\overline{(\frac{\partial u}{\partial x} \frac{\partial w}{\partial z})}$','Interpreter','Latex', 'FontSize',14,'Location','northeastoutside')
+                '$\overline{(\frac{\partial u}{\partial x} \frac{\partial w}{\partial z})}$','$\overline{(\frac{\partial u}{\partial z} \frac{\partial w}{\partial x})}$','Interpreter','Latex', 'FontSize',14,'Location','northeastoutside')
             ylabel('y (cm)'); xlabel('cm^2/s^3'); grid on;
             
             %%%%%%%%%% continuity assumption

@@ -1,8 +1,10 @@
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%ll
 %% script for testing PIVanalysis and methods
 
-clear, clc                                                                                                                  
 close all
+clear all
+clc                                                                                                                  
+
 
 PIVanalysis_test = PIVanalysis(); 
 

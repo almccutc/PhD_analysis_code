@@ -1,7 +1,9 @@
-
+load('samplePIV_data_AM','u_original','v_original','calxy')
 
             deltax = 16*0.0000247; %m        %distance between velocity vectors
-            obj.nu = 0.000000977; %m2/s
+            obj.nu = 0.0000010034; %m2/s, 1.00e-7m2/s
+            obj.u_nanfilter = u_original;
+            obj.v_nanfilter = v_original;
             
             [Ny,Nx,Nt] = size(obj.u_nanfilter); %Ny-# of rows, Nx-# of columns
             
@@ -40,6 +42,13 @@
             
             obj.tau_kt = (obj.nu/obj.epsilon_avg)^0.5; % time (s)
             obj.eta_kl = (obj.nu^3/obj.epsilon_avg)^0.25; %length (m)
+
+            heights=([-Ny/2:1:-1 1:1:Ny/2]).*obj.calibration.*subwindow; %calibrate to cm
+            figure (1)
+            plot(mean(obj.ugrad_termx, "all"), 
+            colorbar
+            %caxis([-0.02,0.02])
+            title(['Dissipation, Iso equation, Avg: ',num2str(obj.epsilon_avg_iso_corrected,5), ' m^2/s^3'])
             
             %integrated dissipation spectrum
             R = (deltax/obj.eta_kl); 

@@ -1,12 +1,14 @@
 
 %% autocorrelation calculation
+load('samplePIV_data_AM','u_original','v_original','calxy')
 
-u_o = obj.u_nanfilter.*100; v_o = obj.v_nanfilter.*100;
-u_o=permute(u_o,[3 1 2]); v_o=permute(v_o,[3 1 2]);
+u_o = u_original(:,32:217,:).*100; v_o = v_original(:,32:217,:).*100; %calibrated to cm/s
+obj.calibration = calxy;
+u_o = permute(u_o,[3,1,2]);
+v_o = permute(v_o,[3,1,2]);
 
 subwindow=16;    %pixels between subwindow centers 
-obj.calibration = 4e-05*100; %calxy; % Ex: 4e-05 m/px 
-[Nt, Ny, Nx]=size(u_o); 
+[~, Ny, Nx]=size(u_o); 
 
 x_c=(Nx+1)/2; % determines the centerline position
 y_c=(Ny+1)/2; % determines the centerline position
@@ -15,6 +17,7 @@ rad_y=[0,(subwindow:subwindow*2:Ny*subwindow).*obj.calibration]; %calibrate to c
 heights=([-Ny/2:1:-1 1:1:Ny/2]).*obj.calibration.*subwindow; %calibrate to cm
 widths=([-Nx/2:1:-1 1:1:Nx/2]).*obj.calibration.*subwindow; %calibrate to cm
 
+%preallocate matrices for speed
 obj.a_u_11_1 = [ones([Ny 1]) NaN([Ny Nx/2])]; obj.a_v_33_1 = [ones([Ny 1]) NaN([Ny Nx/2])];
 obj.a_u_11_3 = [ones([Nx 1]) NaN([Nx Ny/2])]; obj.a_v_33_3 = [ones([Nx 1]) NaN([Nx Ny/2])];
 
@@ -150,7 +153,7 @@ end
     title('$L_{33,3}$','Interpreter','Latex', 'FontSize',14)
     ylabel('L (cm)'); xlabel('width (cm)')
     xlim([min(widths) max(widths)]);
-
+            
     %%
     Resid=YhatG-a_v_33_1(lowb:uppb); % Calc. residuals
     SSR=sum(Resid.^2,2); % Sum of Squared Residuals
