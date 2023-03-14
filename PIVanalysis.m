@@ -1372,16 +1372,16 @@ classdef PIVanalysis < handle
             %%%%%%%%%% %%%%%%%%%% and figure out this equation
             obj.epsilon_2b = 2.*(4.*obj.dudx_term+obj.dudz_term+...
                 obj.dwdx_term+obj.dwdz_term+2.*obj.uzwx_term);
-            obj.epsilon_avg_2b = mean(obj.epsilon_dvdy_dudx,'all','omitnan'); % dissipation rate spatial average
+            obj.epsilon_avg_2b = mean(obj.epsilon_2b,'all','omitnan'); % dissipation rate spatial average
             % Kolmogorov length and time scale
-            obj.tau_kt_2b = (obj.nu/obj.epsilon_dvdy_dudx_avg)^0.5; % time (s)
-            obj.eta_kl_2b = (obj.nu^3/obj.epsilon_dvdy_dudx_avg)^0.25; %length (m)
+            obj.tau_kt_2b = (obj.nu/obj.epsilon_avg_2b)^0.5; % time (s)
+            obj.eta_kl_2b = (obj.nu^3/obj.epsilon_avg_2b)^0.25; %length (m)
             obj.epsilon_median_2b = median(obj.epsilon_2b,'all','omitnan'); 
             
             %%%%%%%%%% Assumption 3a. Isotropic w/ XXa and - dv/dy = dw/dz %%%%%%%%%% 
             obj.epsilon_3a = 2.*(3.*obj.dudx_term+obj.dudz_term+...
                 obj.dwdx_term+2.*obj.dwdz_term+2.*obj.uzwx_term);
-            obj.epsilon_avg_3a = mean(obj.epsilon_dvdy_dwdz,'all','omitnan'); % dissipation rate spatial average
+            obj.epsilon_avg_3a = mean(obj.epsilon_3a,'all','omitnan'); % dissipation rate spatial average
             obj.tau_kt_3a = (obj.nu/obj.epsilon_avg_3a)^0.5; % time (s)
             obj.eta_kl_3a = (obj.nu^3/obj.epsilon_avg_3a)^0.25; %length (m)
             obj.epsilon_median_3a = median(obj.epsilon_3a,'all','omitnan');
