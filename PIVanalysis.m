@@ -182,7 +182,7 @@ classdef PIVanalysis < handle
             %%new tests Nov 2022 
             %load('G:\J20 Tests\4_5V_1sec_60percent_2_5ms_withlid\PIVlab_data','u_original','w_original')
             %load('/Users/almccutc/Desktop/PIVlab_results5V_1sec15p','u_original','v_original','calxy')
-            load('Data/PIVlab_results_6V_1sec_30p_noBS','u_original','v_original','calxy')
+            load('Data/PIVlab_results_5V_1sec_15p','u_original','v_original','calxy')
             obj.u_original = u_original; %(m/s)
             obj.w_original = v_original; %(m/s)
             obj.calibration = calxy*100; % Ex: 4e-05 cm/px
@@ -1328,65 +1328,65 @@ classdef PIVanalysis < handle
             obj.uzwx_term = obj.nu.*mean((((obj.dudz(2:Ny,2:Nx,:)./deltax).*(obj.dwdx(2:Ny,2:Nx,:)./deltax))),3,'omitnan'); %time average
 
             figure (8)
-            plot((mean(obj.dudx_term,2,'omitnan')),obj.heights(1:Ny-1),'-r',...
-                (mean(obj.dwdz_term,2,'omitnan')),obj.heights(1:Ny-1),'--r',...
-                (mean(obj.dudz_term,2,'omitnan')),obj.heights(1:Ny-1),'-k',...
-                (mean(obj.dwdx_term,2,'omitnan')),obj.heights(1:Ny-1),'--k',...
-                (mean(obj.uxwz_term,2,'omitnan')),obj.heights(1:Ny-1),'-b',(mean...
-                (obj.uzwx_term,2,'omitnan')),obj.heights(1:Ny-1),'-g');
+            plot((mean(obj.dudx_term,2,'omitnan')),obj.heights(1:Ny-1),'o',...
+                (mean(obj.dwdz_term,2,'omitnan')),obj.heights(1:Ny-1),'--',...
+                (mean(obj.dudz_term,2,'omitnan')),obj.heights(1:Ny-1),':',...
+                (mean(obj.dwdx_term,2,'omitnan')),obj.heights(1:Ny-1),'-.',...
+                (mean(obj.uxwz_term,2,'omitnan')),obj.heights(1:Ny-1),'-',(mean...
+                (obj.uzwx_term,2,'omitnan')),obj.heights(1:Ny-1),'*');
             title('Dissipation Components','Interpreter','latex', 'FontSize',16)
             legend('$\overline{(\frac{\partial u}{\partial x})^2}$','$\overline{(\frac{\partial w}{\partial z})^2}$','$\overline{(\frac{\partial u}{\partial z})^2}$','$\overline{(\frac{\partial w}{\partial x})^2}$',...
                 '$\overline{(\frac{\partial u}{\partial x} \frac{\partial w}{\partial z})}$','$\overline{(\frac{\partial u}{\partial z} \frac{\partial w}{\partial x})}$','Interpreter','Latex', 'FontSize',14,'Location','northeastoutside')
-            ylabel('y (cm)'); xlabel('cm^2/s^3'); grid on;
+            ylabel('y (cm)'); xlabel('cm^2/s^3'); grid on; ylim([-5 5])
             
-            %%%%%%%%%% Assumption 1a. Continuity w/
+            %%%%%%%%%% Assumption 1a. Continuity w/ u1/x1
             % dissipation rate time average, m2/s3
             obj.epsilon_1a =2.*(4.*obj.dudx_term+obj.dudz_term+...
                 obj.dwdx_term+2.*obj.dwdz_term+2.*obj.uxwz_term+2.*obj.uzwx_term);
             % dissipation rate spatial average
-            obj.epsilon_avg_1a = mean(obj.epsilon,'all','omitnan');   
-            obj.tau_kt_1a = (obj.nu/obj.epsilon_avg)^0.5; % time (s)
-            obj.eta_kl_1a = (obj.nu^3/obj.epsilon_avg)^0.25; %length (m)
+            obj.epsilon_avg_1a = mean(obj.epsilon_1a,'all','omitnan');   
+            obj.tau_kt_1a = (obj.nu/obj.epsilon_avg_1a)^0.5; % time (s)
+            obj.eta_kl_1a = (obj.nu^3/obj.epsilon_avg_1a)^0.25; %length (m)
             obj.epsilon_median_1a = median(obj.epsilon_1a,'all','omitnan'); 
 
-            %%%%%%%%%% Assumption 1b. Continuity w/ and figure out this
+            %%%%%%%%%% Assumption 1b. Continuity w/ u3/x3
             %%%%%%%%%% equation
-            obj.epsilon_1b =2.*(4.*obj.dudx_term+obj.dudz_term+...
-                obj.dwdx_term+2.*obj.dwdz_term+2.*obj.uxwz_term+2.*obj.uzwx_term);
-            obj.epsilon_avg_1b = mean(obj.epsilon,'all','omitnan'); % dissipation rate spatial average   
+            obj.epsilon_1b =2.*(2.*obj.dudx_term+obj.dudz_term+...
+                obj.dwdx_term+4.*obj.dwdz_term+2.*obj.uxwz_term+2.*obj.uzwx_term);
+            obj.epsilon_avg_1b = mean(obj.epsilon_1b,'all','omitnan'); % dissipation rate spatial average   
             % Kolmogorov length and time scale
-            obj.tau_kt_1b = (obj.nu/obj.epsilon_avg)^0.5; % time (s)
-            obj.eta_kl_1b = (obj.nu^3/obj.epsilon_avg)^0.25; %length (m)
+            obj.tau_kt_1b = (obj.nu/obj.epsilon_avg_1b)^0.5; % time (s)
+            obj.eta_kl_1b = (obj.nu^3/obj.epsilon_avg_1b)^0.25; %length (m)
             obj.epsilon_median_1b = median(obj.epsilon_1b,'all','omitnan'); 
 
-            %%%%%%%%%% Assumption 2a. Isotropic w/ XXa and dv/dy = du/dx %%%%%%%%%% 
+            %%%%%%%%%% Assumption 2a. Isotropic w/ du/dx  and dv/dy = du/dx %%%%%%%%%% 
             obj.epsilon_2a = 2.*(4.*obj.dudx_term+obj.dudz_term+...
                 obj.dwdx_term+obj.dwdz_term+2.*obj.uzwx_term);
             obj.epsilon_avg_2a = mean(obj.epsilon_dvdy_dudx,'all','omitnan'); % dissipation rate spatial average
             % Kolmogorov length and time scale
-            obj.tau_kt_2a = (obj.nu/obj.epsilon_dvdy_dudx_avg)^0.5; % time (s)
-            obj.eta_kl_2a = (obj.nu^3/obj.epsilon_dvdy_dudx_avg)^0.25; %length (m)
+            obj.tau_kt_2a = (obj.nu/obj.epsilon_avg_2a)^0.5; % time (s)
+            obj.eta_kl_2a = (obj.nu^3/obj.epsilon_avg_2a)^0.25; %length (m)
             obj.epsilon_median_2a = median(obj.epsilon_2a,'all','omitnan'); 
 
-            %%%%%%%%%% Assumption 2b. Isotropic w/ XXb and dv/dy = du/dx
-            %%%%%%%%%% %%%%%%%%%% and figure out this equation
-            obj.epsilon_2b = 2.*(4.*obj.dudx_term+obj.dudz_term+...
-                obj.dwdx_term+obj.dwdz_term+2.*obj.uzwx_term);
+            %%%%%%%%%% Assumption 2b. Isotropic w/ dw/dz  and dv/dy = du/dx
+            %%%%%%%%%% %%%%%%%%%% 
+            obj.epsilon_2b = 2.*(2.*obj.dudx_term+obj.dudz_term+...
+                obj.dwdx_term+3.*obj.dwdz_term+2.*obj.uzwx_term);
             obj.epsilon_avg_2b = mean(obj.epsilon_2b,'all','omitnan'); % dissipation rate spatial average
             % Kolmogorov length and time scale
             obj.tau_kt_2b = (obj.nu/obj.epsilon_avg_2b)^0.5; % time (s)
             obj.eta_kl_2b = (obj.nu^3/obj.epsilon_avg_2b)^0.25; %length (m)
             obj.epsilon_median_2b = median(obj.epsilon_2b,'all','omitnan'); 
             
-            %%%%%%%%%% Assumption 3a. Isotropic w/ XXa and - dv/dy = dw/dz %%%%%%%%%% 
-            obj.epsilon_3a = 2.*(3.*obj.dudx_term+obj.dudz_term+...
-                obj.dwdx_term+2.*obj.dwdz_term+2.*obj.uzwx_term);
+            %%%%%%%%%% Assumption 3a. Isotropic w/ du/dx and - dv/dy = dw/dz %%%%%%%%%% 
+            obj.epsilon_3a = 2.*(obj.dudx_term+obj.dudz_term+...
+                obj.dwdx_term+4.*obj.dwdz_term+2.*obj.uzwx_term);
             obj.epsilon_avg_3a = mean(obj.epsilon_3a,'all','omitnan'); % dissipation rate spatial average
             obj.tau_kt_3a = (obj.nu/obj.epsilon_avg_3a)^0.5; % time (s)
             obj.eta_kl_3a = (obj.nu^3/obj.epsilon_avg_3a)^0.25; %length (m)
             obj.epsilon_median_3a = median(obj.epsilon_3a,'all','omitnan');
 
-            %%%%%%%%%% Assumption 3b. Isotropic w/ XXb and - dv/dy = dw/dz
+            %%%%%%%%%% Assumption 3b. Isotropic w/ dw/dz and - dv/dy = dw/dz
             %%%%%%%%%% %%%%%%%%%% and figure out this equation
              obj.epsilon_3b = 2.*(3.*obj.dudx_term+obj.dudz_term+...
                 obj.dwdx_term+2.*obj.dwdz_term+2.*obj.uzwx_term);
@@ -1396,30 +1396,69 @@ classdef PIVanalysis < handle
             obj.epsilon_median_3b = median(obj.epsilon_3b,'all','omitnan');
                 
             
-            %%%%% dissipation plot of all 3 assumptions
+            %%%%% dissipation plot of all 6 assumptions
             figure (9) 
-            subplot(1,3,1)
+            subplot(2,3,1)
             imagesc((obj.epsilon_1a), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')
-            title(['$Continuity\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_1a)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_1a,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
+            title(['$1a\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_1a)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_1a,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
             ylabel('cm')
             xlabel('cm')
-            subplot(1,3,2)
-            imagesc((obj.epsilon_2a, 'XData', obj.widths, 'YData',obj.heights)
+
+            subplot(2,3,2)
+            imagesc((obj.epsilon_1b), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')      
-            title(['$\frac{\partial v}{\partial y}=\frac{\partial u}{\partial x}\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_2a,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_2a,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
+            title(['$1b\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_1b,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_1b,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
             ylabel('cm')
             xlabel('cm')
-            subplot(1,3,3)
-            imagesc((obj.epsilon_3a), 'XData', obj.widths, 'YData',obj.heights)
+
+            subplot(2,3,3)
+            imagesc((obj.epsilon_2a), 'XData', obj.widths, 'YData',obj.heights)
             colorbar
             set(gca,'YDir','normal')    
-            title(['$\frac{\partial v}{\partial y}=\frac{\partial w}{\partial x}\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_3a,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_3a,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
+            title(['$2a\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_2a,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_2a,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
+            ylabel('cm')
+            xlabel('cm')
+
+            subplot(2,3,4)
+            set(gcf,'Position',[700 300 1240 300])
+            imagesc((obj.epsilon_2b), 'XData', obj.widths, 'YData',obj.heights)
+            colorbar
+            set(gca,'YDir','normal')
+            title(['$2b\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_2b)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_2b,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
+            ylabel('cm')
+            xlabel('cm')
+
+            subplot(2,3,5)
+            imagesc((obj.epsilon_3a), 'XData', obj.widths, 'YData',obj.heights)
+            colorbar
+            set(gca,'YDir','normal')      
+            title(['$3a\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_3a,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_3a,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
+            ylabel('cm')
+            xlabel('cm')
+
+            subplot(2,3,6)
+            imagesc((obj.epsilon_3b), 'XData', obj.widths, 'YData',obj.heights)
+            colorbar
+            set(gca,'YDir','normal')    
+            title(['$3b\:-\: \overline{\epsilon}\::\:',(num2str(obj.epsilon_avg_3b,3)),'\:cm^2/s^3\;\;M_d:\:',(num2str(obj.epsilon_median_3b,3)),'\:cm^2/s^3$'],'Interpreter','latex', 'FontSize',13)
             ylabel('cm')
             xlabel('cm')
             set(gcf,'Position',[700 300 1240 300])
+
+            figure (10)
+            plot((mean(obj.epsilon_1a,2,'omitnan')),obj.heights(1:Ny-1),'o',...
+                (mean(obj.epsilon_1b,2,'omitnan')),obj.heights(1:Ny-1),'--',...
+                (mean(obj.epsilon_2a,2,'omitnan')),obj.heights(1:Ny-1),':',...
+                (mean(obj.epsilon_2b,2,'omitnan')),obj.heights(1:Ny-1),'-.',...
+                (mean(obj.epsilon_3a,2,'omitnan')),obj.heights(1:Ny-1),'-',(mean...
+                (obj.epsilon_3b,2,'omitnan')),obj.heights(1:Ny-1),'*');
+            title('Dissipation Components','Interpreter','latex', 'FontSize',16)
+            legend('1a','1b','2a','2b',...
+                '3a','3b','Interpreter','Latex', 'FontSize',14,'Location','northeastoutside')
+            ylabel('y (cm)'); xlabel('cm^2/s^3'); grid on; ylim([-5 5])
 
 
         end
